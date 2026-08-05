@@ -2,7 +2,6 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import worker from "../dist/server/index.js";
 
 const port = Number(process.env.PORT ?? 3030);
 const clientRoot = fileURLToPath(new URL("../dist/client/", import.meta.url));
@@ -21,6 +20,21 @@ const contentTypes = {
   ".webp": "image/webp",
 };
 
+async function loadLocalEnv() {
+  try {
+    const envFile = await readFile(new URL("../.env.local", import.meta.url), "utf8");
+    for (const line of envFile.split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (match && !process.env[match[1]]) process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, "");
+    }
+  } catch {
+    // Local preview can still serve public pages without a database.
+  }
+}
+
+await loadLocalEnv();
+const { default: worker } = await import("../dist/server/index.js");
+
 async function assetResponse(request) {
   const pathname = new URL(request.url).pathname;
   if (pathname === "/" || pathname.includes("..")) return new Response("Not found", { status: 404 });
@@ -35,6 +49,14 @@ async function assetResponse(request) {
   } catch {
     return new Response("Not found", { status: 404 });
   }
+}
+
+async function requestBody(incoming) {
+  if (incoming.method === "GET" || incoming.method === "HEAD") return undefined;
+
+  const chunks = [];
+  for await (const chunk of incoming) chunks.push(chunk);
+  return Buffer.concat(chunks);
 }
 
 const server = createServer(async (incoming, outgoing) => {
@@ -54,7 +76,12 @@ const server = createServer(async (incoming, outgoing) => {
       else if (Array.isArray(value)) headers.set(name, value.join(", "));
     }
 
-    const request = new Request(url, { method: incoming.method ?? "GET", headers });
+    const request = new Request(url, {
+      method: incoming.method ?? "GET",
+      headers,
+      body: await requestBody(incoming),
+      duplex: "half",
+    });
     const response = await worker.fetch(
       request,
       { ASSETS: { fetch: assetResponse } },

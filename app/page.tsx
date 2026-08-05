@@ -58,9 +58,10 @@ export default function Home() {
           <a href="/trabalhos">Trabalhos</a>
           <a href="#studio">O studio</a>
           <a href="/contato">Contato</a>
+          <a href="/minha-conta">Minha conta</a>
         </nav>
 
-        <a className="header-cta" href="#agendar">Agendar horário <span>↗</span></a>
+        <a className="header-cta" href="/agendar">Agendar horário <span>↗</span></a>
       </header>
 
       <section className="hero" id="inicio">
@@ -71,7 +72,7 @@ export default function Home() {
             Um studio para viver o cuidado com calma, técnica e um olhar que enxerga a sua beleza de verdade.
           </p>
           <div className="hero-actions">
-            <a className="button button-gold" href="#agendar">Agendar meu horário <span>↗</span></a>
+            <a className="button button-gold" href="/agendar">Agendar meu horário <span>↗</span></a>
             <a className="text-link" href="/servicos">Conhecer serviços <span>→</span></a>
           </div>
           <div className="hero-proof">
@@ -95,7 +96,7 @@ export default function Home() {
       </section>
 
       <section className="quick-links" aria-label="Acessos rápidos">
-        <a href="#agendar"><span>01</span><strong>Agendar horário</strong><i>↗</i></a>
+        <a href="/agendar"><span>01</span><strong>Agendar horário</strong><i>↗</i></a>
         <a href="/servicos"><span>02</span><strong>Explorar serviços</strong><i>↗</i></a>
         <a href="/trabalhos"><span>03</span><strong>Ver trabalhos</strong><i>↗</i></a>
         <a href="https://wa.me/5500000000000" target="_blank" rel="noreferrer"><span>04</span><strong>Falar no WhatsApp</strong><i>↗</i></a>
@@ -117,7 +118,7 @@ export default function Home() {
               <h3>{service.name}</h3>
               <p>{service.description}</p>
               <div className="service-meta"><span>{service.duration}</span><strong>{service.price}</strong></div>
-              <a className="service-link" href="#agendar">Ver detalhes <span>↗</span></a>
+              <a className="service-link" href="/agendar">Ver detalhes <span>↗</span></a>
             </article>
           ))}
         </div>
@@ -147,7 +148,7 @@ export default function Home() {
         </div>
         <div className="portfolio-grid">
           {portfolio.map((item, index) => (
-            <a className={`portfolio-item portfolio-item-${index + 1}`} href="#agendar" key={item.title}>
+            <a className={`portfolio-item portfolio-item-${index + 1}`} href="/agendar" key={item.title}>
               <img src={item.image} alt={item.title} />
               <div className="portfolio-overlay"><span>{item.category}</span><strong>{item.title}</strong><i>↗</i></div>
             </a>
@@ -163,7 +164,7 @@ export default function Home() {
 
       <section className="booking-cta" id="agendar">
         <div><p className="eyebrow">Seu próximo momento <span>✦</span></p><h2>Começa aqui.</h2></div>
-        <div className="booking-actions"><p>Escolha seu serviço e encontre um horário que combine com a sua rotina.</p><a className="button button-gold" href="https://wa.me/5500000000000" target="_blank" rel="noreferrer">Agendar pelo WhatsApp <span>↗</span></a></div>
+        <div className="booking-actions"><p>Escolha seu serviço e encontre um horário que combine com a sua rotina.</p><a className="button button-gold" href="/agendar">Começar agendamento <span>↗</span></a></div>
       </section>
 
       <footer className="site-footer" id="contato">

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+/* eslint-disable @next/next/no-html-link-for-pages -- o preview usa links nativos nas páginas públicas. */
+
 export const metadata: Metadata = {
   title: "Serviços | Jaqueline Beauty Studio",
   description: "Conheça os serviços de cabelo, coloração, tratamentos e penteados do Jaqueline Beauty Studio.",
@@ -69,9 +71,9 @@ export default function ServicesPage() {
           <span><strong>Jaqueline</strong><small>Beauty Studio</small></span>
         </a>
         <nav className="main-nav" aria-label="Navegação principal">
-          <a href="/">Início</a><a className="active" href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="/#studio">O studio</a><a href="/contato">Contato</a>
+          <a href="/">Início</a><a className="active" href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="/#studio">O studio</a><a href="/contato">Contato</a><a href="/minha-conta">Minha conta</a>
         </nav>
-        <a className="header-cta" href="/#agendar">Agendar horário <span>↗</span></a>
+        <a className="header-cta" href="/agendar">Agendar horário <span>↗</span></a>
       </header>
 
       <section className="catalog-hero">
@@ -94,9 +96,9 @@ export default function ServicesPage() {
               <h2>{category.title}</h2>
               <p className="category-description">{category.description}</p>
               <div className="service-list">
-                {category.services.map(([name, price, duration]) => <a href="/#agendar" className="service-row" key={name}><span>{name}</span><small>{duration}</small><strong>{price}</strong><i>↗</i></a>)}
+                {category.services.map(([name, price, duration]) => <a href="/agendar" className="service-row" key={name}><span>{name}</span><small>{duration}</small><strong>{price}</strong><i>↗</i></a>)}
               </div>
-              <a className="button button-gold" href="/#agendar">Agendar este cuidado <span>↗</span></a>
+              <a className="button button-gold" href="/agendar">Agendar este cuidado <span>↗</span></a>
             </div>
             <span className="category-index">0{index + 1}</span>
           </article>

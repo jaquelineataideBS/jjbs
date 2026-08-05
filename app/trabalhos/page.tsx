@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-html-link-for-pages -- o preview usa links nativos nas páginas públicas. */
+
 import { useMemo, useState } from "react";
 
 const workItems = [
@@ -21,8 +23,8 @@ export default function WorksPage() {
     <main className="works-page">
       <header className="site-header">
         <a className="brand" href="/" aria-label="Jaqueline Beauty Studio - início"><span className="brand-mark">J</span><span><strong>Jaqueline</strong><small>Beauty Studio</small></span></a>
-        <nav className="main-nav" aria-label="Navegação principal"><a href="/">Início</a><a href="/servicos">Serviços</a><a className="active" href="/trabalhos">Trabalhos</a><a href="/#studio">O studio</a><a href="/contato">Contato</a></nav>
-        <a className="header-cta" href="/#agendar">Agendar horário <span>↗</span></a>
+        <nav className="main-nav" aria-label="Navegação principal"><a href="/">Início</a><a href="/servicos">Serviços</a><a className="active" href="/trabalhos">Trabalhos</a><a href="/#studio">O studio</a><a href="/contato">Contato</a><a href="/minha-conta">Minha conta</a></nav>
+        <a className="header-cta" href="/agendar">Agendar horário <span>↗</span></a>
       </header>
 
       <section className="works-hero">
@@ -32,10 +34,10 @@ export default function WorksPage() {
 
       <section className="works-gallery" aria-label="Galeria de trabalhos">
         <div className="works-toolbar"><p>Inspire-se <span>·</span> {visibleItems.length.toString().padStart(2, "0")} resultados</p><div className="filter-list" aria-label="Filtrar trabalhos">{filters.map((filter) => <button className={activeFilter === filter ? "filter-chip active" : "filter-chip"} key={filter} onClick={() => setActiveFilter(filter)} aria-pressed={activeFilter === filter}>{filter}</button>)}</div></div>
-        <div className="works-grid">{visibleItems.map((item, index) => <article className={`work-card work-card-${(index % 3) + 1}`} key={item.title}><div className="work-image"><img src={item.image} alt={item.title} /><span className="work-number">0{index + 1}</span></div><div className="work-info"><p>{item.category}</p><h2>{item.title}</h2><span>{item.detail}</span><a href="/#agendar">Quero um resultado assim <b>↗</b></a></div></article>)}</div>
+        <div className="works-grid">{visibleItems.map((item, index) => <article className={`work-card work-card-${(index % 3) + 1}`} key={item.title}><div className="work-image"><img src={item.image} alt={item.title} /><span className="work-number">0{index + 1}</span></div><div className="work-info"><p>{item.category}</p><h2>{item.title}</h2><span>{item.detail}</span><a href="/agendar">Quero um resultado assim <b>↗</b></a></div></article>)}</div>
       </section>
 
-      <section className="works-cta"><p className="eyebrow">Agora é a sua vez <span>✦</span></p><h2>Vamos criar algo<br /><em>que tenha a sua cara?</em></h2><a className="button button-gold" href="/#agendar">Agendar meu horário <span>↗</span></a></section>
+      <section className="works-cta"><p className="eyebrow">Agora é a sua vez <span>✦</span></p><h2>Vamos criar algo<br /><em>que tenha a sua cara?</em></h2><a className="button button-gold" href="/agendar">Agendar meu horário <span>↗</span></a></section>
       <footer className="site-footer"><div className="footer-bottom"><span>© 2026 Jaqueline Beauty Studio</span><span>Seg–Sáb · 09h às 19h</span><a href="#top">Voltar ao topo ↑</a></div></footer>
     </main>
   );

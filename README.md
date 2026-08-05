@@ -94,6 +94,17 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
+## Agendamento e banco
+
+O fluxo público de `/agendar` envia solicitações para `POST /api/appointments`.
+O endpoint valida os dados no servidor, calcula a duração usando o serviço cadastrado
+e impede conflitos de horário. O projeto usa Neon PostgreSQL por meio de
+`DATABASE_URL`.
+
+Para preparar um ambiente novo, aplique as migrations de `drizzle-pg/` e execute
+`scripts/seed-neon.mjs`. O seed cria somente categorias e serviços; nunca use seed
+como substituto dos dados de produção.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)

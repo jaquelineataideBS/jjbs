@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+/* eslint-disable @next/next/no-html-link-for-pages -- o preview usa links nativos nas páginas públicas. */
+
 export const metadata: Metadata = {
   title: "Contato | Jaqueline Beauty Studio",
   description: "Entre em contato com o Jaqueline Beauty Studio, consulte horários e agende seu atendimento.",
@@ -12,8 +14,8 @@ export default function ContactPage() {
     <main className="contact-page">
       <header className="site-header">
         <a className="brand" href="/" aria-label="Jaqueline Beauty Studio - início"><span className="brand-mark">J</span><span><strong>Jaqueline</strong><small>Beauty Studio</small></span></a>
-        <nav className="main-nav" aria-label="Navegação principal"><a href="/">Início</a><a href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="/#studio">O studio</a><a className="active" href="/contato">Contato</a></nav>
-        <a className="header-cta" href="/#agendar">Agendar horário <span>↗</span></a>
+        <nav className="main-nav" aria-label="Navegação principal"><a href="/">Início</a><a href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="/#studio">O studio</a><a className="active" href="/contato">Contato</a><a href="/minha-conta">Minha conta</a></nav>
+        <a className="header-cta" href="/agendar">Agendar horário <span>↗</span></a>
       </header>
 
       <section className="contact-hero">

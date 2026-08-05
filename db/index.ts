@@ -1,13 +1,34 @@
-import { env } from "cloudflare:workers";
-import { drizzle } from "drizzle-orm/d1";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
-export function getDb() {
-  if (!env.DB) {
-    throw new Error(
-      "Cloudflare D1 binding `DB` is unavailable. Set the `d1` field in .openai/hosting.json to `DB` or let your control plane inject the real binding values before using the database."
-    );
+type RuntimeEnv = {
+  DATABASE_URL?: string;
+  DB?: unknown;
+};
+
+function localDatabaseUrl() {
+  const runtimeProcess = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process;
+  return runtimeProcess?.env?.DATABASE_URL;
+}
+
+export async function getDatabaseUrl() {
+  const localUrl = localDatabaseUrl();
+  if (localUrl) return localUrl;
+
+  try {
+    const runtime = await import("cloudflare:workers") as { env?: RuntimeEnv };
+    return runtime.env?.DATABASE_URL;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getDb() {
+  const databaseUrl = await getDatabaseUrl();
+  if (!databaseUrl) {
+    throw new Error("Neon DATABASE_URL is unavailable. Configure DATABASE_URL in the runtime environment before using the database.");
   }
 
-  return drizzle(env.DB, { schema });
+  return drizzle(neon(databaseUrl), { schema });
 }
