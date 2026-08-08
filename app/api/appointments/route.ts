@@ -1,6 +1,7 @@
-import { and, eq, gt, lt, notInArray } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, ne, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { appointmentServices, appointments, blockedTimes, businessHours, clients, professionalServices, professionals, services } from "../../../db/schema";
+import { getCurrentUser } from "../../../lib/auth";
 import { addMinutes, isClockTime, rangesOverlap, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const blockedStatuses = ["cancelled_by_client", "cancelled_by_salon"];
@@ -10,6 +11,7 @@ type BookingPayload = {
   professionalId: string;
   appointmentDate: string;
   startTime: string;
+  rescheduleId?: string;
   client: {
     name: string;
     phone: string;
@@ -29,6 +31,7 @@ function parsePayload(value: unknown): BookingPayload | null {
   const professionalId = typeof value.professionalId === "string" ? value.professionalId.trim() : "";
   const appointmentDate = typeof value.appointmentDate === "string" ? value.appointmentDate.trim() : "";
   const startTime = typeof value.startTime === "string" ? value.startTime.trim() : "";
+  const rescheduleId = typeof value.rescheduleId === "string" ? value.rescheduleId.trim() : "";
   const clientName = typeof value.client.name === "string" ? value.client.name.trim() : "";
   const phone = typeof value.client.phone === "string" ? value.client.phone.trim() : "";
   const email = typeof value.client.email === "string" ? value.client.email.trim() : "";
@@ -44,6 +47,7 @@ function parsePayload(value: unknown): BookingPayload | null {
     professionalId,
     appointmentDate,
     startTime,
+    rescheduleId: rescheduleId || undefined,
     client: { name: clientName, phone, email: email || undefined, notes: notes || undefined },
   };
 }
@@ -68,6 +72,23 @@ export async function POST(request: Request) {
 
   try {
     const db = await getDb();
+    const currentUser = await getCurrentUser(request);
+    const nowTime = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Fortaleza", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+    const [rescheduledAppointment] = payload.rescheduleId && currentUser
+      ? await db.select({ id: appointments.id, clientId: appointments.clientId, appointmentDate: appointments.appointmentDate, startTime: appointments.startTime, status: appointments.status })
+        .from(appointments)
+        .innerJoin(clients, eq(clients.id, appointments.clientId))
+        .where(and(eq(appointments.id, payload.rescheduleId), eq(clients.userId, currentUser.id)))
+        .limit(1)
+      : [];
+    if (payload.rescheduleId && !currentUser) return json({ message: "Entre na sua conta para reagendar um atendimento." }, 401);
+    if (payload.rescheduleId && !rescheduledAppointment) return json({ message: "O agendamento original não foi encontrado na sua conta." }, 404);
+    if (rescheduledAppointment && (!["pending_confirmation", "confirmed"].includes(rescheduledAppointment.status)
+      || rescheduledAppointment.appointmentDate < todayInFortaleza()
+      || (rescheduledAppointment.appointmentDate === todayInFortaleza() && rescheduledAppointment.startTime <= nowTime))) {
+      return json({ message: "Este agendamento não pode mais ser reagendado pela área da cliente." }, 409);
+    }
+
     const [service] = await db.select().from(services).where(and(eq(services.id, payload.serviceId), eq(services.active, true))).limit(1);
 
     if (!service) {
@@ -101,6 +122,7 @@ export async function POST(request: Request) {
       notInArray(appointments.status, blockedStatuses),
       lt(appointments.startTime, endTime),
       gt(appointments.endTime, payload.startTime),
+      rescheduledAppointment ? ne(appointments.id, rescheduledAppointment.id) : undefined,
     )).limit(1);
     const conflict = conflictRows[0];
 
@@ -108,40 +130,60 @@ export async function POST(request: Request) {
       return json({ message: "Este horário acabou de ser reservado. Escolha outro horário disponível." }, 409);
     }
 
-    const clientId = crypto.randomUUID();
+    const [linkedClient] = currentUser
+      ? await db.select({ id: clients.id }).from(clients).where(eq(clients.userId, currentUser.id)).limit(1)
+      : [];
+    const clientId = rescheduledAppointment?.clientId ?? linkedClient?.id ?? crypto.randomUUID();
     const appointmentId = crypto.randomUUID();
     const appointmentServiceId = crypto.randomUUID();
 
-    await db.batch([
-      db.insert(clients).values({
-        id: clientId,
-        name: payload.client.name,
-        phone: payload.client.phone,
-        email: payload.client.email,
-        notes: payload.client.notes,
-      }),
-      db.insert(appointments).values({
-        id: appointmentId,
-        clientId,
-        professionalId: professional.id,
-        appointmentDate: payload.appointmentDate,
-        startTime: payload.startTime,
-        endTime,
-        status: "pending_confirmation",
-        totalEstimatedCents: service.priceCents,
-        notesClient: payload.client.notes,
-        source: "website",
-      }),
-      db.insert(appointmentServices).values({
-        id: appointmentServiceId,
-        appointmentId,
-        serviceId: service.id,
-        priceCents: service.priceCents,
-        durationMinutes: service.durationMinutes,
-      }),
-    ]);
+    const appointmentValues = {
+      id: appointmentId,
+      clientId,
+      professionalId: professional.id,
+      appointmentDate: payload.appointmentDate,
+      startTime: payload.startTime,
+      endTime,
+      status: "pending_confirmation",
+      totalEstimatedCents: service.priceCents,
+      notesClient: payload.client.notes,
+      source: "website",
+    };
+    const appointmentServiceValues = {
+      id: appointmentServiceId,
+      appointmentId,
+      serviceId: service.id,
+      priceCents: service.priceCents,
+      durationMinutes: service.durationMinutes,
+    };
 
-    return json({ appointmentId, status: "pending_confirmation" }, 201);
+    if (rescheduledAppointment) {
+      await db.batch([
+        db.insert(appointments).values(appointmentValues),
+        db.insert(appointmentServices).values(appointmentServiceValues),
+        db.update(appointments).set({ status: "rescheduled", updatedAt: new Date() }).where(and(eq(appointments.id, rescheduledAppointment.id), inArray(appointments.status, ["pending_confirmation", "confirmed"]))),
+      ]);
+    } else if (linkedClient) {
+      await db.batch([
+        db.insert(appointments).values(appointmentValues),
+        db.insert(appointmentServices).values(appointmentServiceValues),
+      ]);
+    } else {
+      await db.batch([
+        db.insert(clients).values({
+          id: clientId,
+          userId: currentUser?.id,
+          name: currentUser?.name ?? payload.client.name,
+          phone: currentUser?.phone ?? payload.client.phone,
+          email: currentUser?.email ?? payload.client.email,
+          notes: payload.client.notes,
+        }),
+        db.insert(appointments).values(appointmentValues),
+        db.insert(appointmentServices).values(appointmentServiceValues),
+      ]);
+    }
+
+    return json({ appointmentId, status: "pending_confirmation", rescheduledFromId: rescheduledAppointment?.id }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("D1 binding") || message.includes("DB") || message.includes("cloudflare:") || message.includes("ERR_UNSUPPORTED_ESM_URL_SCHEME")) {

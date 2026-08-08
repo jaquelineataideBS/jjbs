@@ -41,6 +41,7 @@ export default function BookingPage() {
   const [availabilityNote, setAvailabilityNote] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rescheduleId, setRescheduleId] = useState("");
 
   const selectedService = services.find((item) => item.id === serviceId) ?? services[0];
   const selectedProfessional = professionals.find((item) => item.id === professionalId) ?? fallbackProfessional;
@@ -48,11 +49,27 @@ export default function BookingPage() {
 
   useEffect(() => {
     let active = true;
+    const search = new URLSearchParams(window.location.search);
+    const requestedServiceId = search.get("service")?.trim() ?? "";
+    const requestedProfessionalId = search.get("professional")?.trim() ?? "";
+    setRescheduleId(search.get("reschedule")?.trim() ?? "");
+    if (requestedProfessionalId) setProfessionalId(requestedProfessionalId);
+
+    void fetch("/api/auth/me", { cache: "no-store" }).then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.user && active) {
+        const account = result.user as { name?: string; phone?: string | null; email?: string };
+        setClient((current) => ({ ...current, name: account.name ?? current.name, phone: account.phone ?? current.phone, email: account.email ?? current.email }));
+      }
+    }).catch(() => undefined);
+
     void fetch("/api/booking-options", { cache: "no-store" }).then(async (response) => {
       const result = await response.json().catch(() => ({}));
       if (response.ok && Array.isArray(result.services) && result.services.length && active) {
         setServices(result.services as Service[]);
-        setServiceId((current) => result.services.some((service: Service) => service.id === current) ? current : result.services[0].id);
+        setServiceId((current) => requestedServiceId && result.services.some((service: Service) => service.id === requestedServiceId)
+          ? requestedServiceId
+          : result.services.some((service: Service) => service.id === current) ? current : result.services[0].id);
       }
     }).catch(() => undefined);
     return () => { active = false; };
@@ -96,7 +113,7 @@ export default function BookingPage() {
     if (!acceptedPolicy) return setError("Aceite a política de cancelamento para finalizar.");
     setError(""); setIsSubmitting(true);
     try {
-      const response = await fetch("/api/appointments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ serviceId, professionalId, appointmentDate: date, startTime: time, client }) });
+      const response = await fetch("/api/appointments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ serviceId, professionalId, appointmentDate: date, startTime: time, client, rescheduleId: rescheduleId || undefined }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof result.message === "string" ? result.message : "Não foi possível registrar o agendamento agora.");
       setSubmitted(true);
