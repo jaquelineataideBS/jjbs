@@ -93,6 +93,8 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm run build`: verify the vinext build output
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
+- `npm run db:migrate`: apply pending PostgreSQL migrations
+- `npm run db:seed`: apply the idempotent initial catalog and schedule seed
 
 ## Agendamento e banco
 
@@ -102,8 +104,21 @@ e impede conflitos de horário. O projeto usa Neon PostgreSQL por meio de
 `DATABASE_URL`.
 
 Para preparar um ambiente novo, aplique as migrations de `drizzle-pg/` e execute
-`scripts/seed-neon.mjs`. O seed cria somente categorias e serviços; nunca use seed
-como substituto dos dados de produção.
+`npm.cmd run db:seed`. A agenda inicial cadastra Jaqueline Justino, associa os
+serviços ativos e deixa segunda a sábado, 09h–19h, com intervalo de 12h–13h.
+Tudo pode ser alterado em `/admin`, na aba **Configurar agenda**. O seed é
+idempotente e não substitui dados de produção.
+
+## Primeiro acesso administrativo
+
+Crie a conta da proprietária em `/minha-conta` e promova somente esse e-mail para administradora com a variável `ADMIN_EMAIL` definida no terminal. O comando usa a mesma `DATABASE_URL` já configurada e nunca expõe a senha:
+
+```powershell
+$env:ADMIN_EMAIL = "seu-email@exemplo.com"
+npm.cmd run admin:promote
+```
+
+Depois entre novamente e acesse `/admin`. As APIs administrativas recusam qualquer conta sem `role = admin`.
 
 ## Learn More
 

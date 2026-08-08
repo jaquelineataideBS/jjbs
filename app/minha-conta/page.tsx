@@ -123,6 +123,7 @@ export default function MyAccountPage() {
             <article className="account-card account-card-main"><span className="account-card-label">Próximo agendamento</span><h2>Seu próximo cuidado<br /><em>ainda não foi marcado.</em></h2><p>Escolha um serviço e encontre um horário para viver a experiência JBS.</p><a className="button button-gold" href="/agendar">Agendar meu horário <span>↗</span></a></article>
             <article className="account-card"><span className="account-card-label">Seu histórico</span><h2>Os momentos que<br /><em>já vivemos juntas.</em></h2><p className="account-empty">Seu histórico aparecerá aqui depois do primeiro atendimento.</p></article>
             <article className="account-card account-profile-card"><span className="account-card-label">Seus dados</span><strong>{user.name}</strong><p>{user.email}<br />{user.phone ?? "Telefone não informado"}</p><button className="text-button" type="button" disabled>Editar dados em breve</button></article>
+            {user.role === "admin" && <article className="account-card account-profile-card"><span className="account-card-label">Administração</span><strong>Painel do studio</strong><p>Controle agenda, clientes e serviços com acesso protegido.</p><a className="text-link" href="/admin">Abrir painel administrativo <span>→</span></a></article>}
           </div>
         </section>
       ) : (

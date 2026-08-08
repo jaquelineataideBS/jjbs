@@ -32,7 +32,7 @@ function bytesToBase64Url(bytes: Uint8Array) {
 
 async function derivePasswordHash(password: string, salt: Uint8Array) {
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: passwordIterations, hash: "SHA-256" }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: Uint8Array.from(salt), iterations: passwordIterations, hash: "SHA-256" }, key, 256);
   return new Uint8Array(bits);
 }
 

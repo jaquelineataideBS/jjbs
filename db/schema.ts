@@ -72,9 +72,63 @@ export const services = pgTable("services", {
   activeIndex: index("services_active_idx").on(table.active),
 }));
 
+export const professionals = pgTable("professionals", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  title: text("title"),
+  phone: text("phone"),
+  active: boolean("active").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => ({
+  activeOrderIndex: index("professionals_active_order_idx").on(table.active, table.displayOrder),
+}));
+
+export const professionalServices = pgTable("professional_services", {
+  id: text("id").primaryKey(),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  serviceId: text("service_id").notNull().references(() => services.id),
+  createdAt: createdAt(),
+}, (table) => ({
+  professionalIndex: index("professional_services_professional_idx").on(table.professionalId),
+  serviceIndex: index("professional_services_service_idx").on(table.serviceId),
+  professionalServiceUnique: uniqueIndex("professional_services_unique").on(table.professionalId, table.serviceId),
+}));
+
+export const businessHours = pgTable("business_hours", {
+  id: text("id").primaryKey(),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  weekday: integer("weekday").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  breakStart: text("break_start"),
+  breakEnd: text("break_end"),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => ({
+  professionalWeekdayUnique: uniqueIndex("business_hours_professional_weekday_unique").on(table.professionalId, table.weekday),
+  professionalIndex: index("business_hours_professional_idx").on(table.professionalId),
+}));
+
+export const blockedTimes = pgTable("blocked_times", {
+  id: text("id").primaryKey(),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  blockDate: text("block_date").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  reason: text("reason"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => ({
+  professionalDateIndex: index("blocked_times_professional_date_idx").on(table.professionalId, table.blockDate),
+}));
+
 export const appointments = pgTable("appointments", {
   id: text("id").primaryKey(),
   clientId: text("client_id").notNull().references(() => clients.id),
+  professionalId: text("professional_id").references(() => professionals.id),
   appointmentDate: text("appointment_date").notNull(),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
@@ -88,6 +142,7 @@ export const appointments = pgTable("appointments", {
   dateIndex: index("appointments_date_idx").on(table.appointmentDate),
   clientDateIndex: index("appointments_client_date_idx").on(table.clientId, table.appointmentDate),
   slotIndex: index("appointments_slot_idx").on(table.appointmentDate, table.startTime, table.endTime),
+  professionalSlotIndex: index("appointments_professional_slot_idx").on(table.professionalId, table.appointmentDate, table.startTime, table.endTime),
 }));
 
 export const appointmentServices = pgTable("appointment_services", {

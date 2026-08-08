@@ -2,26 +2,15 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
-type RuntimeEnv = {
-  DATABASE_URL?: string;
-  DB?: unknown;
-};
-
 function localDatabaseUrl() {
   const runtimeProcess = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process;
   return runtimeProcess?.env?.DATABASE_URL;
 }
 
 export async function getDatabaseUrl() {
-  const localUrl = localDatabaseUrl();
-  if (localUrl) return localUrl;
-
-  try {
-    const runtime = await import("cloudflare:workers") as { env?: RuntimeEnv };
-    return runtime.env?.DATABASE_URL;
-  } catch {
-    return undefined;
-  }
+  // Vercel provides runtime variables through process.env. Keeping this lookup
+  // free of Cloudflare-only module imports lets the same app compile on Vercel.
+  return localDatabaseUrl();
 }
 
 export async function getDb() {

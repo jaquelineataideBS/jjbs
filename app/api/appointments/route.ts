@@ -1,11 +1,13 @@
 import { and, eq, gt, lt, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { appointmentServices, appointments, clients, services } from "../../../db/schema";
+import { appointmentServices, appointments, blockedTimes, businessHours, clients, professionalServices, professionals, services } from "../../../db/schema";
+import { addMinutes, isClockTime, rangesOverlap, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const blockedStatuses = ["cancelled_by_client", "cancelled_by_salon"];
 
 type BookingPayload = {
   serviceId: string;
+  professionalId: string;
   appointmentDate: string;
   startTime: string;
   client: {
@@ -24,6 +26,7 @@ function parsePayload(value: unknown): BookingPayload | null {
   if (!isRecord(value) || !isRecord(value.client)) return null;
 
   const serviceId = typeof value.serviceId === "string" ? value.serviceId.trim() : "";
+  const professionalId = typeof value.professionalId === "string" ? value.professionalId.trim() : "";
   const appointmentDate = typeof value.appointmentDate === "string" ? value.appointmentDate.trim() : "";
   const startTime = typeof value.startTime === "string" ? value.startTime.trim() : "";
   const clientName = typeof value.client.name === "string" ? value.client.name.trim() : "";
@@ -31,25 +34,18 @@ function parsePayload(value: unknown): BookingPayload | null {
   const email = typeof value.client.email === "string" ? value.client.email.trim() : "";
   const notes = typeof value.client.notes === "string" ? value.client.notes.trim() : "";
 
-  if (!serviceId || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || !/^\d{2}:\d{2}$/.test(startTime)) return null;
+  if (!serviceId || !professionalId || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || !isClockTime(startTime)) return null;
   if (clientName.length < 2 || clientName.length > 120 || phone.replace(/\D/g, "").length < 8 || phone.length > 30) return null;
   if (email && (email.length > 160 || !/^\S+@\S+\.\S+$/.test(email))) return null;
   if (notes.length > 500) return null;
 
   return {
     serviceId,
+    professionalId,
     appointmentDate,
     startTime,
     client: { name: clientName, phone, email: email || undefined, notes: notes || undefined },
   };
-}
-
-function addMinutes(startTime: string, durationMinutes: number) {
-  const [hours, minutes] = startTime.split(":").map(Number);
-  const totalMinutes = hours * 60 + minutes + durationMinutes;
-  const endHours = Math.floor(totalMinutes / 60);
-  const endMinutes = totalMinutes % 60;
-  return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
 }
 
 function json(data: Record<string, unknown>, status = 200) {
@@ -68,6 +64,7 @@ export async function POST(request: Request) {
   if (!payload) {
     return json({ message: "Revise os dados obrigatórios do agendamento." }, 400);
   }
+  if (payload.appointmentDate < todayInFortaleza()) return json({ message: "Escolha uma data futura para o agendamento." }, 400);
 
   try {
     const db = await getDb();
@@ -77,12 +74,29 @@ export async function POST(request: Request) {
       return json({ message: "Este serviço não está disponível para agendamento." }, 400);
     }
 
+    const [professional] = await db.select({ id: professionals.id }).from(professionals)
+      .innerJoin(professionalServices, eq(professionalServices.professionalId, professionals.id))
+      .where(and(eq(professionals.id, payload.professionalId), eq(professionals.active, true), eq(professionalServices.serviceId, service.id)))
+      .limit(1);
+    if (!professional) return json({ message: "A profissional escolhida não atende este serviço." }, 400);
+
     const endTime = addMinutes(payload.startTime, service.durationMinutes);
-    if (endTime > "20:00") {
-      return json({ message: "O horário escolhido ultrapassa o funcionamento do studio." }, 400);
+    const [hours] = await db.select({ startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
+      .from(businessHours)
+      .where(and(eq(businessHours.professionalId, professional.id), eq(businessHours.weekday, weekdayForDate(payload.appointmentDate)), eq(businessHours.active, true)))
+      .limit(1);
+    if (!hours || payload.startTime < hours.startTime || endTime > hours.endTime) return json({ message: "O horário escolhido está fora do expediente da profissional." }, 400);
+    if (hours.breakStart && hours.breakEnd && rangesOverlap({ startTime: payload.startTime, endTime }, { startTime: hours.breakStart, endTime: hours.breakEnd })) {
+      return json({ message: "O horário escolhido coincide com o intervalo da profissional." }, 400);
     }
 
+    const blocked = await db.select({ id: blockedTimes.id }).from(blockedTimes).where(and(
+      eq(blockedTimes.professionalId, professional.id), eq(blockedTimes.blockDate, payload.appointmentDate), lt(blockedTimes.startTime, endTime), gt(blockedTimes.endTime, payload.startTime),
+    )).limit(1);
+    if (blocked[0]) return json({ message: "Este horário foi bloqueado pelo studio. Escolha outra opção." }, 409);
+
     const conflictRows = await db.select({ id: appointments.id }).from(appointments).where(and(
+      eq(appointments.professionalId, professional.id),
       eq(appointments.appointmentDate, payload.appointmentDate),
       notInArray(appointments.status, blockedStatuses),
       lt(appointments.startTime, endTime),
@@ -109,6 +123,7 @@ export async function POST(request: Request) {
       db.insert(appointments).values({
         id: appointmentId,
         clientId,
+        professionalId: professional.id,
         appointmentDate: payload.appointmentDate,
         startTime: payload.startTime,
         endTime,

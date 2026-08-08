@@ -8,6 +8,13 @@
       "when": 1785943333582,
       "tag": "0000_legal_shriek",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786161082081,
+      "tag": "0001_gigantic_venom",
+      "breakpoints": true
     }
   ]
 }

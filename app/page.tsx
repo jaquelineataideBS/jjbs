@@ -44,12 +44,9 @@ export default function Home() {
   return (
     <main>
       <header className="site-header">
-        <a className="brand" href="#inicio" aria-label="Jaqueline Beauty Studio - início">
-          <span className="brand-mark">J</span>
-          <span>
-            <strong>Jaqueline</strong>
-            <small>Beauty Studio</small>
-          </span>
+        <a className="brand" href="#inicio" aria-label="Jaqueline Justino Beauty Studio - início">
+          <span className="brand-symbol" aria-hidden="true"><img src="/jaqueline-justino-monogram.png?v=1" alt="" /></span>
+          <span className="brand-name"><strong>Jaqueline Justino</strong><small>Beauty Studio</small></span>
         </a>
 
         <nav className="main-nav" aria-label="Navegação principal">
@@ -85,13 +82,13 @@ export default function Home() {
 
         <div className="hero-visual">
           <div className="hero-photo-wrap">
-            <img src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=85" alt="Interior elegante de um studio de beleza" />
+            <img src="/jaqueline-justino-hero.png" alt="Jaqueline Justino, proprietária do Jaqueline Justino Beauty Studio, no studio de beleza" />
           </div>
           <div className="hero-note">
             <span className="note-star">✦</span>
-            <p>Onde cuidado<br /><em>vira presença.</em></p>
+            <p>Jaqueline Justino<br /><em>proprietária & especialista.</em></p>
           </div>
-          <div className="hero-stamp">JBS<br /><small>EST. 2019</small></div>
+          <div className="hero-stamp" aria-label="Jaqueline Justino Beauty Studio"><span className="hero-stamp-symbol" aria-hidden="true"><img src="/jaqueline-justino-monogram.png?v=1" alt="" /></span></div>
         </div>
       </section>
 
@@ -169,14 +166,14 @@ export default function Home() {
 
       <footer className="site-footer" id="contato">
         <div className="footer-top">
-          <div><a className="brand footer-brand" href="#inicio"><span className="brand-mark">J</span><span><strong>Jaqueline</strong><small>Beauty Studio</small></span></a><p>Beleza, cuidado e transformação<br />em cada detalhe.</p></div>
+          <div><a className="brand footer-brand" href="#inicio"><span className="brand-symbol" aria-hidden="true"><img src="/jaqueline-justino-monogram.png?v=1" alt="" /></span><span className="brand-name"><strong>Jaqueline Justino</strong><small>Beauty Studio</small></span></a><p>Beleza, cuidado e transformação<br />em cada detalhe.</p></div>
           <div className="footer-column"><span>Visite o studio</span><p>Rua da Beleza, 120<br />Fortaleza · CE</p></div>
           <div className="footer-column"><span>Fale com a gente</span><p>(85) 99999-0000<br /><a href="mailto:oi@jaquelinebeauty.com">oi@jaquelinebeauty.com</a></p></div>
           <div className="footer-column"><span>Redes</span><p><a href="#contato">Instagram ↗</a><br /><a href="https://wa.me/5500000000000">WhatsApp ↗</a></p></div>
         </div>
-        <div className="footer-bottom"><span>© 2026 Jaqueline Beauty Studio</span><span>Seg–Sáb · 09h às 19h</span><a href="#inicio">Voltar ao topo ↑</a></div>
+        <div className="footer-bottom"><span>© 2026 Jaqueline Justino Beauty Studio</span><span>Seg–Sáb · 09h às 19h</span><a href="#inicio">Voltar ao topo ↑</a></div>
       </footer>
-      <a className="floating-whatsapp" href="https://wa.me/5500000000000" target="_blank" rel="noreferrer" aria-label="Falar com Jaqueline Beauty Studio pelo WhatsApp">◔</a>
+      <a className="floating-whatsapp" href="https://wa.me/5500000000000" target="_blank" rel="noreferrer" aria-label="Falar com Jaqueline Justino Beauty Studio pelo WhatsApp">◔</a>
     </main>
   );
 }
