@@ -13,7 +13,7 @@ export default function ContactPage() {
   return (
     <main className="contact-page">
       <header className="site-header">
-        <a className="brand" href="/" aria-label="Jaqueline Beauty Studio - início"><span className="brand-mark">J</span><span><strong>Jaqueline</strong><small>Beauty Studio</small></span></a>
+        <a className="brand" href="/" aria-label="Jaqueline Justino Beauty Studio - início"><span className="brand-symbol" aria-hidden="true"><img src="/jaqueline-justino-monogram.png?v=1" alt="" /></span><span className="brand-name"><strong>Jaqueline Justino</strong><small>Beauty Studio</small></span></a>
         <nav className="main-nav" aria-label="Navegação principal"><a href="/">Início</a><a href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="/#studio">O studio</a><a className="active" href="/contato">Contato</a><a href="/minha-conta">Minha conta</a></nav>
         <a className="header-cta" href="/agendar">Agendar horário <span>↗</span></a>
       </header>
