@@ -1,5 +1,9 @@
 type ResetEmailResult = { delivered: boolean };
 
+export function isPasswordResetEmailConfigured() {
+  return Boolean(process.env.RESEND_API_KEY && process.env.PASSWORD_RESET_FROM_EMAIL);
+}
+
 export async function sendPasswordResetEmail(email: string, resetUrl: string): Promise<ResetEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.PASSWORD_RESET_FROM_EMAIL;
@@ -19,5 +23,6 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string): P
     }),
   });
 
+  if (!response.ok) console.error(`Password reset email provider returned HTTP ${response.status}.`);
   return { delivered: response.ok };
 }

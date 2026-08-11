@@ -2,11 +2,16 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { passwordResetTokens, users } from "../../../../db/schema";
 import { createPasswordResetToken, hashToken } from "../../../../lib/auth";
-import { sendPasswordResetEmail } from "../../../../lib/password-reset-email";
+import { isPasswordResetEmailConfigured, sendPasswordResetEmail } from "../../../../lib/password-reset-email";
 
 const genericMessage = "Se existir uma conta com este e-mail, enviaremos um link de redefinição.";
+const unavailableMessage = "O envio de recuperação por e-mail ainda não está configurado. Fale com o studio para recuperar seu acesso.";
 
 export async function POST(request: Request) {
+  if (!isPasswordResetEmailConfigured()) {
+    return Response.json({ message: unavailableMessage }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+
   let email = "";
   try {
     const body: unknown = await request.json();
@@ -37,7 +42,10 @@ export async function POST(request: Request) {
     await db.insert(passwordResetTokens).values({ id: crypto.randomUUID(), userId: user.id, tokenHash: await hashToken(token), expiresAt });
 
     const origin = process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin;
-    await sendPasswordResetEmail(user.email, `${origin}/redefinir-senha?token=${encodeURIComponent(token)}`);
+    const delivery = await sendPasswordResetEmail(user.email, `${origin}/redefinir-senha?token=${encodeURIComponent(token)}`);
+    if (!delivery.delivered) {
+      await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.tokenHash, await hashToken(token)));
+    }
   } catch {
     // A resposta permanece genérica para não revelar contas ou detalhes internos.
   }
