@@ -1,7 +1,8 @@
 import { asc, desc, eq, gte } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { appointmentServices, appointments, clients, serviceCategories, services } from "../../../../db/schema";
-import { requireAdmin } from "../../../../lib/admin";
+import { requirePermission } from "../../../../lib/admin";
+import { permissionsForRole } from "../../../../lib/permissions";
 
 const cancelledStatuses = ["cancelled_by_client", "cancelled_by_salon"];
 
@@ -11,7 +12,7 @@ function todayInFortaleza() {
 
 export async function GET(request: Request) {
   try {
-    const admin = await requireAdmin(request);
+    const admin = await requirePermission(request, "dashboard");
     if (!admin) return Response.json({ message: "Acesso restrito ao painel administrativo." }, { status: 403, headers: { "Cache-Control": "no-store" } });
 
     const db = await getDb();
@@ -57,11 +58,12 @@ export async function GET(request: Request) {
     const todayAgenda = activeAgenda.filter((item) => item.appointmentDate === today);
     const pending = activeAgenda.filter((item) => item.status === "pending_confirmation");
     const estimatedCents = todayAgenda.reduce((total, item) => total + (item.totalEstimatedCents ?? 0), 0);
+    const permissions = permissionsForRole(admin.role);
 
     return Response.json({
-      admin: { name: admin.name },
+      admin: { id: admin.id, name: admin.name, role: admin.role, permissions },
       today,
-      stats: { todayCount: todayAgenda.length, pendingCount: pending.length, clientsCount: clientRows.length, estimatedCents },
+      stats: { todayCount: todayAgenda.length, pendingCount: pending.length, clientsCount: clientRows.length, estimatedCents: permissions.includes("finance") ? estimatedCents : 0 },
       appointments: agenda,
       clients: clientRows,
       services: serviceRows,

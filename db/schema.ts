@@ -168,6 +168,7 @@ export const professionals = pgTable(
   "professionals",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     title: text("title"),
     phone: text("phone"),
@@ -177,6 +178,7 @@ export const professionals = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => ({
+    userUnique: uniqueIndex("professionals_user_unique").on(table.userId),
     activeOrderIndex: index("professionals_active_order_idx").on(
       table.active,
       table.displayOrder,

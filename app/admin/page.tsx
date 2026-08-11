@@ -11,6 +11,8 @@ import MarketingManagement from "./marketing-management";
 import PortfolioManagement from "./portfolio-management";
 import ReviewsManagement from "./reviews-management";
 import SettingsManagement from "./settings-management";
+import UsersManagement from "./users-management";
+import type { Permission } from "../../lib/permissions";
 
 type Appointment = {
   id: string;
@@ -43,7 +45,7 @@ type Service = {
   active: boolean;
 };
 type Overview = {
-  admin: { name: string };
+  admin: { id: string; name: string; role: string; permissions: Permission[] };
   today: string;
   stats: {
     todayCount: number;
@@ -179,7 +181,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [tab, setTab] = useState<
-    "agenda" | "schedule" | "services" | "clients" | "portfolio" | "finance" | "marketing" | "communication" | "reviews" | "settings"
+    "agenda" | "schedule" | "services" | "clients" | "portfolio" | "finance" | "marketing" | "communication" | "reviews" | "settings" | "users"
   >("agenda");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -268,6 +270,7 @@ export default function AdminPage() {
     schedule?.professionals.find(
       (item) => item.id === selectedProfessionalId,
     ) ?? null;
+  const can = (permission: Permission) => Boolean(data?.admin.permissions.includes(permission));
   const agenda = data?.appointments ?? [];
   function note(value: string, isError = false) {
     setMessage(value);
@@ -576,11 +579,11 @@ export default function AdminPage() {
                 <strong>{data.stats.clientsCount}</strong>
                 <small>base exibida no painel</small>
               </article>
-              <article>
+              {can("finance") && <article>
                 <span>Estimativa de hoje</span>
                 <strong>{money(data.stats.estimatedCents)}</strong>
                 <small>sem descontos aplicados</small>
-              </article>
+              </article>}
             </section>
             <div
               className="admin-tabs"
@@ -596,6 +599,7 @@ export default function AdminPage() {
               </button>
               <button
                 className={tab === "schedule" ? "active" : ""}
+                hidden={!can("schedule")}
                 type="button"
                 onClick={() => setTab("schedule")}
               >
@@ -603,6 +607,7 @@ export default function AdminPage() {
               </button>
               <button
                 className={tab === "services" ? "active" : ""}
+                hidden={!can("services")}
                 type="button"
                 onClick={() => setTab("services")}
               >
@@ -610,6 +615,7 @@ export default function AdminPage() {
               </button>
               <button
                 className={tab === "clients" ? "active" : ""}
+                hidden={!can("clients")}
                 type="button"
                 onClick={() => setTab("clients")}
               >
@@ -617,6 +623,7 @@ export default function AdminPage() {
               </button>
               <button
                 className={tab === "portfolio" ? "active" : ""}
+                hidden={!can("portfolio")}
                 type="button"
                 onClick={() => setTab("portfolio")}
               >
@@ -624,6 +631,7 @@ export default function AdminPage() {
               </button>
               <button
                 className={tab === "finance" ? "active" : ""}
+                hidden={!can("finance")}
                 type="button"
                 onClick={() => setTab("finance")}
               >
@@ -631,14 +639,16 @@ export default function AdminPage() {
               </button>
               <button
                 className={tab === "marketing" ? "active" : ""}
+                hidden={!can("marketing")}
                 type="button"
                 onClick={() => setTab("marketing")}
               >
                 Promoções e fidelidade
               </button>
-              <button className={tab === "communication" ? "active" : ""} type="button" onClick={() => setTab("communication")}>Comunicação</button>
-              <button className={tab === "reviews" ? "active" : ""} type="button" onClick={() => setTab("reviews")}>Avaliações</button>
-              <button className={tab === "settings" ? "active" : ""} type="button" onClick={() => setTab("settings")}>Configurações</button>
+              <button className={tab === "communication" ? "active" : ""} hidden={!can("communication")} type="button" onClick={() => setTab("communication")}>Comunicação</button>
+              <button className={tab === "reviews" ? "active" : ""} hidden={!can("reviews")} type="button" onClick={() => setTab("reviews")}>Avaliações</button>
+              <button className={tab === "settings" ? "active" : ""} hidden={!can("settings")} type="button" onClick={() => setTab("settings")}>Configurações</button>
+              <button className={tab === "users" ? "active" : ""} hidden={!can("users")} type="button" onClick={() => setTab("users")}>Usuários</button>
             </div>
             {tab === "agenda" && (
               <section className="admin-panel">
@@ -1318,6 +1328,7 @@ export default function AdminPage() {
             {tab === "communication" && <CommunicationManagement />}
             {tab === "reviews" && <ReviewsManagement />}
             {tab === "settings" && <SettingsManagement />}
+            {tab === "users" && <UsersManagement />}
           </>
         )}
       </section>

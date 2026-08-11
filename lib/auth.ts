@@ -13,6 +13,7 @@ export type AuthUser = {
   email: string;
   phone: string | null;
   role: string;
+  status: string;
 };
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -108,8 +109,8 @@ export async function getCurrentUser(request: Request) {
   const [session] = await db.select().from(sessions).where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, new Date()))).limit(1);
   if (!session) return null;
 
-  const [user] = await db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone, role: users.role }).from(users).where(eq(users.id, session.userId)).limit(1);
-  return user ?? null;
+  const [user] = await db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone, role: users.role, status: users.status }).from(users).where(eq(users.id, session.userId)).limit(1);
+  return user?.status === "active" ? user : null;
 }
 
 export async function removeCurrentSession(request: Request) {

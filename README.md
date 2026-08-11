@@ -118,7 +118,17 @@ $env:ADMIN_EMAIL = "seu-email@exemplo.com"
 npm.cmd run admin:promote
 ```
 
-Depois entre novamente e acesse `/admin`. As APIs administrativas recusam qualquer conta sem `role = admin`.
+Depois entre novamente e acesse `/admin`. A primeira conta administrativa passa a criar os demais acessos internos pelo próprio painel.
+
+## Usuários internos e permissões
+
+Na aba **Usuários** do painel administrativo, um administrador pode cadastrar, editar e inativar acessos internos, redefinir senhas e vincular uma conta a uma profissional da agenda.
+
+- **Administrador:** acesso total, incluindo usuários.
+- **Gestão:** operação, financeiro, marketing, comunicação, avaliações e configurações, sem administrar contas.
+- **Funcionário:** painel, agenda e clientes.
+
+As permissões são verificadas nas APIs. Contas inativas perdem as sessões abertas, o próprio administrador não pode inativar ou alterar seu cargo e o último administrador ativo é protegido. Antes de usar o vínculo entre usuário e profissional em um ambiente existente, aplique as migrations de `drizzle-pg/` com `npm.cmd run db:migrate`.
 
 ## Recuperação de senha
 
