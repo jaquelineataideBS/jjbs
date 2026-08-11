@@ -122,13 +122,9 @@ Depois entre novamente e acesse `/admin`. As APIs administrativas recusam qualqu
 
 ## Recuperação de senha
 
-O login oferece **Esqueci minha senha**. Os links são de uso único, expiram em 30 minutos e somente o hash do token é armazenado no Neon. Configure em produção:
+O login oferece **Esqueci minha senha**. A recuperação é local: o usuário informa o e-mail, continua neste site e cria uma nova senha. Nenhum e-mail é enviado. O token de uso único expira em 30 minutos e somente seu hash é armazenado no Neon.
 
-- `NEXT_PUBLIC_SITE_URL`: endereço oficial do site;
-- `RESEND_API_KEY`: chave da conta Resend;
-- `PASSWORD_RESET_FROM_EMAIL`: remetente validado, por exemplo `Jaqueline Beauty Studio <acesso@seudominio.com>`.
-
-Enquanto o envio de e-mail não estiver configurado, a administração pode gerar um link único sem alterar ou expor a senha:
+Para uma recuperação administrativa sem alterar ou expor a senha, gere um link único no terminal:
 
 ```powershell
 $env:RESET_EMAIL = "cliente@exemplo.com"
