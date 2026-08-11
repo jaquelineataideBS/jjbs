@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     const userId = crypto.randomUUID();
     await db.batch([
       db.insert(users).values({ id: userId, name, email, phone, passwordHash: await hashPassword(password), role: "client", status: "active" }),
-      db.insert(clients).values({ id: crypto.randomUUID(), userId, name, phone, email }),
+      db.insert(clients).values({ id: crypto.randomUUID(), userId, name, phone, whatsapp: phone, email }),
     ]);
 
     const session = await createSession(db, userId);

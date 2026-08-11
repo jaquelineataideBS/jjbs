@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- o preview usa links nativos nas páginas públicas. */
 
 import { useEffect, useState } from "react";
+import AccountReviews from "./account-reviews";
 
 type AccountUser = {
   id: string;
@@ -32,6 +33,8 @@ type AppointmentSummary = {
   upcoming: AccountAppointment[];
   history: AccountAppointment[];
 };
+type LoyaltyData = { account: { points: number; stamps: number; referrals: number }; history: Array<{ id: string; description: string; pointsDelta: number; stampsDelta: number; referralsDelta: number; createdAt: string }> };
+type AccountNotification = { id: string; title: string; message: string; type: string; readAt: string | null; createdAt: string };
 
 type FormData = {
   name: string;
@@ -78,6 +81,8 @@ export default function MyAccountPage() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({ name: "", email: "", phone: "" });
+  const [loyalty, setLoyalty] = useState<LoyaltyData>({ account: { points: 0, stamps: 0, referrals: 0 }, history: [] });
+  const [accountNotifications, setAccountNotifications] = useState<AccountNotification[]>([]);
 
   async function loadAppointments() {
     setAppointmentsLoading(true);
@@ -97,6 +102,23 @@ export default function MyAccountPage() {
     }
   }
 
+  async function loadLoyalty() {
+    const response = await fetch("/api/account/loyalty", { cache: "no-store" });
+    if (response.ok) setLoyalty(await response.json());
+  }
+
+  async function loadNotifications() {
+    const response = await fetch("/api/account/notifications", { cache: "no-store" });
+    if (response.ok) setAccountNotifications((await response.json()).notifications ?? []);
+  }
+
+  async function markNotificationsRead() {
+    const ids = accountNotifications.filter((item) => !item.readAt).map((item) => item.id);
+    if (!ids.length) return;
+    const response = await fetch("/api/account/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+    if (response.ok) await loadNotifications();
+  }
+
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
       .then(async (response) => {
@@ -111,6 +133,8 @@ export default function MyAccountPage() {
           setUser(accountUser);
           setProfile({ name: accountUser.name, email: accountUser.email, phone: accountUser.phone ?? "" });
           void loadAppointments();
+          void loadLoyalty();
+          void loadNotifications();
         }
       })
       .catch(() => setMessage("Não foi possível verificar sua sessão agora."))
@@ -154,6 +178,8 @@ export default function MyAccountPage() {
       setUser(accountUser);
       setProfile({ name: accountUser.name, email: accountUser.email, phone: accountUser.phone ?? "" });
       await loadAppointments();
+      await loadLoyalty();
+      await loadNotifications();
       setMessage(mode === "register" ? "Conta criada com segurança." : "Login realizado com sucesso.");
       setForm(emptyForm);
     } catch (error) {
@@ -170,6 +196,8 @@ export default function MyAccountPage() {
     setEditingProfile(false);
     setProfile({ name: "", email: "", phone: "" });
     setAppointments(emptyAppointments);
+    setLoyalty({ account: { points: 0, stamps: 0, referrals: 0 }, history: [] });
+    setAccountNotifications([]);
     setMode("login");
     setMessage("Sessão encerrada.");
   }
@@ -257,6 +285,9 @@ export default function MyAccountPage() {
               {appointmentsLoading ? <p className="account-empty">Organizando seu histórico…</p> : appointments.history.length ? <div className="account-appointment-list">{appointments.history.slice(0, 8).map((appointment) => <div className="account-appointment" key={appointment.id}><div><small>{statusLabels[appointment.status] ?? appointment.status}</small><strong>{appointment.serviceName ?? "Atendimento no studio"}</strong><span>{dateLabel(appointment.appointmentDate)} · {appointment.startTime}</span><span>{appointment.professionalName ?? "Profissional do studio"} · {money(appointment.totalEstimatedCents)}</span></div></div>)}</div> : <><h2>Os momentos que<br /><em>já vivemos juntas.</em></h2><p className="account-empty">Seu histórico aparecerá aqui depois do primeiro atendimento.</p></>}
             </article>
             <article className="account-card account-profile-card"><span className="account-card-label">Seus dados</span>{editingProfile ? <form className="account-profile-form" onSubmit={saveProfile}><label>Nome completo<input value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} required maxLength={120} /></label><label>E-mail<input type="email" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} required maxLength={160} /></label><label>WhatsApp<input value={profile.phone} onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))} required maxLength={30} inputMode="tel" /></label><div className="account-profile-actions"><button className="button button-gold" type="submit" disabled={profileSaving}>{profileSaving ? "Salvando…" : "Salvar dados"}</button><button className="text-button" type="button" onClick={() => { setEditingProfile(false); setProfile({ name: user.name, email: user.email, phone: user.phone ?? "" }); }}>Cancelar</button></div></form> : <><strong>{user.name}</strong><p>{user.email}<br />{user.phone ?? "Telefone não informado"}</p><button className="text-button" type="button" onClick={() => setEditingProfile(true)}>Editar meus dados</button></>}</article>
+            <article className="account-card loyalty-account-card"><span className="account-card-label">Sua fidelidade</span><div className="loyalty-account-numbers"><div><strong>{loyalty.account.points}</strong><small>pontos</small></div><div><strong>{loyalty.account.stamps}</strong><small>carimbos</small></div><div><strong>{loyalty.account.referrals}</strong><small>indicações</small></div></div>{loyalty.history[0] ? <p>Último movimento: {loyalty.history[0].description}</p> : <p>Seus benefícios aparecerão aqui após os atendimentos.</p>}<a className="text-link" href="/promocoes">Ver promoções ativas <span>→</span></a></article>
+            <article className="account-card account-notifications-card"><span className="account-card-label">Notificações</span>{accountNotifications.length ? <><div className="account-notification-list">{accountNotifications.slice(0, 5).map((item) => <div className={item.readAt ? "" : "unread"} key={item.id}><strong>{item.title}</strong><p>{item.message}</p></div>)}</div>{accountNotifications.some((item) => !item.readAt) && <button className="text-button" type="button" onClick={() => void markNotificationsRead()}>Marcar como lidas</button>}</> : <p className="account-empty">Seus lembretes e confirmações aparecerão aqui.</p>}</article>
+            <AccountReviews />
             {user.role === "admin" && <article className="account-card account-profile-card"><span className="account-card-label">Administração</span><strong>Painel do studio</strong><p>Controle agenda, clientes e serviços com acesso protegido.</p><a className="text-link" href="/admin">Abrir painel administrativo <span>→</span></a></article>}
           </div>
         </section>

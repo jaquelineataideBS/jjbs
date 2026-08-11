@@ -1,3 +1,5 @@
+import ReviewsHighlight from "./reviews-highlight";
+
 const services = [
   {
     number: "01",
@@ -96,7 +98,9 @@ export default function Home() {
         <a href="/agendar"><span>01</span><strong>Agendar horário</strong><i>↗</i></a>
         <a href="/servicos"><span>02</span><strong>Explorar serviços</strong><i>↗</i></a>
         <a href="/trabalhos"><span>03</span><strong>Ver trabalhos</strong><i>↗</i></a>
-        <a href="https://wa.me/5500000000000" target="_blank" rel="noreferrer"><span>04</span><strong>Falar no WhatsApp</strong><i>↗</i></a>
+        <a href="/promocoes"><span>04</span><strong>Promoções</strong><i>↗</i></a>
+        <a href="https://wa.me/5500000000000" target="_blank" rel="noreferrer"><span>05</span><strong>Falar no WhatsApp</strong><i>↗</i></a>
+        <a href="/lista-de-espera"><span>06</span><strong>Lista de espera</strong><i>↗</i></a>
       </section>
 
       <section className="section services-section" id="servicos">
@@ -154,6 +158,7 @@ export default function Home() {
       </section>
 
       <section className="quote-section">
+        <div className="reviews-live"><ReviewsHighlight /></div>
         <span className="quote-mark">“</span>
         <blockquote>Saí me sentindo linda, leve e muito mais segura de mim. O cuidado em cada detalhe faz toda a diferença.</blockquote>
         <p>Mariana, cliente JBS <span>✦✦✦✦✦</span></p>

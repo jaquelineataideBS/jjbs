@@ -30,7 +30,7 @@ export async function PATCH(request: Request) {
 
     await db.batch([
       db.update(users).set({ name, email, phone, updatedAt: new Date() }).where(eq(users.id, currentUser.id)),
-      db.update(clients).set({ name, email, phone, updatedAt: new Date() }).where(eq(clients.userId, currentUser.id)),
+      db.update(clients).set({ name, email, phone, whatsapp: phone, updatedAt: new Date() }).where(eq(clients.userId, currentUser.id)),
     ]);
 
     return noStore({ user: { ...currentUser, name, email, phone }, message: "Seus dados foram atualizados." });

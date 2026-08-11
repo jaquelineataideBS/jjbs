@@ -42,3 +42,4 @@ next-env.d.ts
 /work/
 /.openai/
 preview-3030*.log
+local-3030*.log

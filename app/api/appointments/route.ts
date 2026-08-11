@@ -175,6 +175,7 @@ export async function POST(request: Request) {
           userId: currentUser?.id,
           name: currentUser?.name ?? payload.client.name,
           phone: currentUser?.phone ?? payload.client.phone,
+          whatsapp: currentUser?.phone ?? payload.client.phone,
           email: currentUser?.email ?? payload.client.email,
           notes: payload.client.notes,
         }),

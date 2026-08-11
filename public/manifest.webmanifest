@@ -1,0 +1,11 @@
+{
+  "name": "Jaqueline Justino Beauty Studio",
+  "short_name": "JBS Studio",
+  "description": "Agendamentos e cuidados do Jaqueline Beauty Studio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0B0B",
+  "theme_color": "#0B0B0B",
+  "lang": "pt-BR",
+  "icons": [{ "src": "/jaqueline-justino-monogram.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}

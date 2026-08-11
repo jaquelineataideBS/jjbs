@@ -1,0 +1,2 @@
+import type { MetadataRoute } from "next";
+export default function sitemap(): MetadataRoute.Sitemap { const host=process.env.NEXT_PUBLIC_SITE_URL??(process.env.VERCEL_PROJECT_PRODUCTION_URL?`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`:"http://127.0.0.1:3030");return ["","/servicos","/trabalhos","/promocoes","/agendar","/contato","/lista-de-espera","/privacidade"].map(path=>({url:`${host}${path}`,lastModified:new Date(),changeFrequency:path===""?"weekly":"monthly",priority:path===""?1:.7})); }

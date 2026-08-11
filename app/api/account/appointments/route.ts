@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { appointmentServices, appointments, clients, professionals, services } from "../../../../db/schema";
+import { appointmentServices, appointments, clients, professionals, salonSettings, services } from "../../../../db/schema";
 import { getCurrentUser } from "../../../../lib/auth";
 
 const cancellableStatuses = ["pending_confirmation", "confirmed"];
@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     if (!user) return noStore({ message: "Entre na sua conta para consultar os agendamentos." }, 401);
 
     const db = await getDb();
+    const [settings] = await db.select({ cancellationHours: salonSettings.cancellationHours }).from(salonSettings).where(eq(salonSettings.id, "studio")).limit(1);
+    const cancellationHours = settings?.cancellationHours ?? 24;
     const rows = await db.select({
       id: appointments.id,
       appointmentDate: appointments.appointmentDate,
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
       isUpcoming: futureStatuses.has(appointment.status)
         && (appointment.appointmentDate > now.date || (appointment.appointmentDate === now.date && appointment.endTime > now.time)),
       canCancel: cancellableStatuses.includes(appointment.status)
-        && (appointment.appointmentDate > now.date || (appointment.appointmentDate === now.date && appointment.startTime > now.time)),
+        && new Date(`${appointment.appointmentDate}T${appointment.startTime}:00-03:00`).getTime() - Date.now() >= cancellationHours * 60 * 60 * 1000,
     }));
 
     return noStore({
@@ -79,6 +81,8 @@ export async function PATCH(request: Request) {
     }
 
     const db = await getDb();
+    const [settings] = await db.select({ cancellationHours: salonSettings.cancellationHours }).from(salonSettings).where(eq(salonSettings.id, "studio")).limit(1);
+    const cancellationHours = settings?.cancellationHours ?? 24;
     const [ownedAppointment] = await db.select({
       id: appointments.id,
       appointmentDate: appointments.appointmentDate,
@@ -90,9 +94,7 @@ export async function PATCH(request: Request) {
       .limit(1);
 
     if (!ownedAppointment) return noStore({ message: "Agendamento não encontrado." }, 404);
-    const now = nowInFortaleza();
-    const isFuture = ownedAppointment.appointmentDate > now.date
-      || (ownedAppointment.appointmentDate === now.date && ownedAppointment.startTime > now.time);
+    const isFuture = new Date(`${ownedAppointment.appointmentDate}T${ownedAppointment.startTime}:00-03:00`).getTime() - Date.now() >= cancellationHours * 60 * 60 * 1000;
     if (!isFuture || !cancellableStatuses.includes(ownedAppointment.status)) {
       return noStore({ message: "Este agendamento não pode mais ser cancelado pela área da cliente." }, 409);
     }
