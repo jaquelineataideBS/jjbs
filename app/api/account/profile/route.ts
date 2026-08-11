@@ -2,6 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { clients, users } from "../../../../db/schema";
 import { getCurrentUser } from "../../../../lib/auth";
+import { normalizeWhatsapp } from "../../../../lib/masks";
 
 function noStore(data: Record<string, unknown>, status = 200) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -17,9 +18,9 @@ export async function PATCH(request: Request) {
     const values = body as Record<string, unknown>;
     const name = typeof values.name === "string" ? values.name.trim() : "";
     const email = typeof values.email === "string" ? values.email.trim().toLowerCase() : "";
-    const phone = typeof values.phone === "string" ? values.phone.trim() : "";
+    const phone = normalizeWhatsapp(values.phone);
 
-    if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || phone.replace(/\D/g, "").length < 8 || phone.length > 30) {
+    if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || !phone) {
       return noStore({ message: "Informe nome, e-mail e WhatsApp válidos." }, 400);
     }
 

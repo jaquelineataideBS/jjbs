@@ -10,12 +10,12 @@ import {
   users,
 } from "../../../../db/schema";
 import { requireAdmin } from "../../../../lib/admin";
+import { normalizeWhatsapp } from "../../../../lib/masks";
 import { todayInFortaleza } from "../../../../lib/scheduling";
 
 type ClientInput = {
   id?: string;
   name: string;
-  phone: string;
   whatsapp: string;
   email: string | null;
   birthDate: string | null;
@@ -55,9 +55,7 @@ function parseClient(value: unknown): ClientInput | null {
   if (!isRecord(value)) return null;
   const id = typeof value.id === "string" ? value.id.trim() : undefined;
   const name = typeof value.name === "string" ? value.name.trim() : "";
-  const phone = typeof value.phone === "string" ? value.phone.trim() : "";
-  const whatsapp =
-    typeof value.whatsapp === "string" ? value.whatsapp.trim() : phone;
+  const whatsapp = normalizeWhatsapp(value.whatsapp);
   const emailValue = optionalText(value.email, 160);
   const birthDate = optionalText(value.birthDate, 10);
   const address = optionalText(value.address, 300);
@@ -65,15 +63,7 @@ function parseClient(value: unknown): ClientInput | null {
   const allergies = optionalText(value.allergies, 1000);
   const notes = optionalText(value.notes, 2000);
 
-  if (
-    name.length < 2 ||
-    name.length > 120 ||
-    phone.replace(/\D/g, "").length < 8 ||
-    phone.length > 30
-  )
-    return null;
-  if (whatsapp.replace(/\D/g, "").length < 8 || whatsapp.length > 30)
-    return null;
+  if (name.length < 2 || name.length > 120 || !whatsapp) return null;
   if (
     emailValue === undefined ||
     (emailValue && !/^\S+@\S+\.\S+$/.test(emailValue))
@@ -89,7 +79,6 @@ function parseClient(value: unknown): ClientInput | null {
   return {
     id,
     name,
-    phone,
     whatsapp,
     email: emailValue?.toLowerCase() ?? null,
     birthDate: birthDate ?? null,
@@ -106,7 +95,7 @@ function parseClient(value: unknown): ClientInput | null {
 function clientValues(input: ClientInput) {
   return {
     name: input.name,
-    phone: input.phone,
+    phone: input.whatsapp,
     whatsapp: input.whatsapp,
     email: input.email,
     birthDate: input.birthDate,
@@ -272,14 +261,13 @@ export async function POST(request: Request) {
     if (!input)
       return noStore(
         {
-          message:
-            "Revise nome, telefone, WhatsApp e os demais dados da cliente.",
+          message: "Revise nome, WhatsApp e os demais dados da cliente.",
         },
         400,
       );
     const db = await getDb();
     const duplicateConditions = [
-      eq(clients.phone, input.phone),
+      eq(clients.phone, input.whatsapp),
       eq(clients.whatsapp, input.whatsapp),
     ];
     if (input.email) duplicateConditions.push(eq(clients.email, input.email));
@@ -291,8 +279,7 @@ export async function POST(request: Request) {
     if (duplicate)
       return noStore(
         {
-          message:
-            "Já existe uma cliente com este telefone, WhatsApp ou e-mail.",
+          message: "Já existe uma cliente com este WhatsApp ou e-mail.",
         },
         409,
       );
@@ -382,7 +369,7 @@ export async function PATCH(request: Request) {
       ? await db.batch([
           updateClient,
           writeAudit,
-          db.update(users).set({ name: input.name, email: input.email, phone: input.phone, updatedAt: new Date() }).where(eq(users.id, current.userId)),
+          db.update(users).set({ name: input.name, email: input.email, phone: input.whatsapp, updatedAt: new Date() }).where(eq(users.id, current.userId)),
         ])
       : await db.batch([updateClient, writeAudit]);
     return noStore({

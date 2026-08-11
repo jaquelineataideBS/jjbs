@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect -- dados administrativos são carregados após autenticação. */
 
 import { FormEvent, useEffect, useState } from "react";
+import { formatWhatsapp } from "../../lib/masks";
 
 type Client = {
   id: string;
@@ -40,7 +41,6 @@ type HistoryItem = {
 type ClientForm = {
   id?: string;
   name: string;
-  phone: string;
   whatsapp: string;
   email: string;
   birthDate: string;
@@ -55,7 +55,6 @@ type ClientForm = {
 
 const emptyClient: ClientForm = {
   name: "",
-  phone: "",
   whatsapp: "",
   email: "",
   birthDate: "",
@@ -151,8 +150,7 @@ export default function ClientManagement() {
     setForm({
       id: client.id,
       name: client.name,
-      phone: client.phone,
-      whatsapp: client.whatsapp ?? client.phone,
+      whatsapp: formatWhatsapp(client.whatsapp ?? client.phone),
       email: client.email ?? "",
       birthDate: client.birthDate ?? "",
       address: client.address ?? "",
@@ -194,10 +192,7 @@ export default function ClientManagement() {
       const result = await request("/api/admin/clients", {
         method: form.id ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          whatsapp: form.whatsapp || form.phone,
-        }),
+        body: JSON.stringify(form),
       });
       setFeedback(messageOf(result, "Cliente salva com sucesso."));
       setIsError(false);
@@ -276,36 +271,23 @@ export default function ClientManagement() {
               />
             </label>
           </div>
-          <div className="admin-form-grid">
-            <label>
-              Telefone
-              <input
-                value={form.phone}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    phone: event.target.value,
-                  }))
-                }
-                maxLength={30}
-                required
-              />
-            </label>
-            <label>
-              WhatsApp
-              <input
-                value={form.whatsapp}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    whatsapp: event.target.value,
-                  }))
-                }
-                maxLength={30}
-                placeholder="Se for diferente"
-              />
-            </label>
-          </div>
+          <label>
+            WhatsApp
+            <input
+              value={form.whatsapp}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  whatsapp: formatWhatsapp(event.target.value),
+                }))
+              }
+              autoComplete="tel"
+              inputMode="tel"
+              maxLength={15}
+              placeholder="(85) 99999-0000"
+              required
+            />
+          </label>
           <label>
             E-mail
             <input
@@ -437,7 +419,7 @@ export default function ClientManagement() {
                 <span>Relacionamento</span>
                 <h2>Clientes cadastradas</h2>
               </div>
-              <p>Busca por nome, telefone, WhatsApp ou e-mail.</p>
+              <p>Busca por nome, WhatsApp ou e-mail.</p>
             </div>
             <form
               className="admin-client-search"

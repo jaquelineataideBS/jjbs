@@ -2,6 +2,7 @@ import { and, eq, gt, inArray, lt, ne, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { appointmentServices, appointments, blockedTimes, businessHours, clients, professionalServices, professionals, services } from "../../../db/schema";
 import { getCurrentUser } from "../../../lib/auth";
+import { normalizeWhatsapp } from "../../../lib/masks";
 import { addMinutes, isClockTime, rangesOverlap, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const blockedStatuses = ["cancelled_by_client", "cancelled_by_salon"];
@@ -33,12 +34,12 @@ function parsePayload(value: unknown): BookingPayload | null {
   const startTime = typeof value.startTime === "string" ? value.startTime.trim() : "";
   const rescheduleId = typeof value.rescheduleId === "string" ? value.rescheduleId.trim() : "";
   const clientName = typeof value.client.name === "string" ? value.client.name.trim() : "";
-  const phone = typeof value.client.phone === "string" ? value.client.phone.trim() : "";
+  const phone = normalizeWhatsapp(value.client.phone);
   const email = typeof value.client.email === "string" ? value.client.email.trim() : "";
   const notes = typeof value.client.notes === "string" ? value.client.notes.trim() : "";
 
   if (!serviceId || !professionalId || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || !isClockTime(startTime)) return null;
-  if (clientName.length < 2 || clientName.length > 120 || phone.replace(/\D/g, "").length < 8 || phone.length > 30) return null;
+  if (clientName.length < 2 || clientName.length > 120 || !phone) return null;
   if (email && (email.length > 160 || !/^\S+@\S+\.\S+$/.test(email))) return null;
   if (notes.length > 500) return null;
 

@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- o preview usa links nativos nas páginas públicas. */
 
 import { useEffect, useState } from "react";
+import { formatWhatsapp } from "../../lib/masks";
 import AccountReviews from "./account-reviews";
 
 type AccountUser = {
@@ -131,7 +132,7 @@ export default function MyAccountPage() {
         if (result.user) {
           const accountUser = result.user as AccountUser;
           setUser(accountUser);
-          setProfile({ name: accountUser.name, email: accountUser.email, phone: accountUser.phone ?? "" });
+          setProfile({ name: accountUser.name, email: accountUser.email, phone: formatWhatsapp(accountUser.phone ?? "") });
           void loadAppointments();
           void loadLoyalty();
           void loadNotifications();
@@ -176,7 +177,7 @@ export default function MyAccountPage() {
       if (!response.ok) throw new Error(typeof result.message === "string" ? result.message : "Não foi possível concluir agora.");
       const accountUser = result.user as AccountUser;
       setUser(accountUser);
-      setProfile({ name: accountUser.name, email: accountUser.email, phone: accountUser.phone ?? "" });
+      setProfile({ name: accountUser.name, email: accountUser.email, phone: formatWhatsapp(accountUser.phone ?? "") });
       await loadAppointments();
       await loadLoyalty();
       await loadNotifications();
@@ -241,7 +242,7 @@ export default function MyAccountPage() {
       if (!response.ok) throw new Error(typeof result.message === "string" ? result.message : "Não foi possível atualizar seus dados.");
       const updatedUser = result.user as AccountUser;
       setUser(updatedUser);
-      setProfile({ name: updatedUser.name, email: updatedUser.email, phone: updatedUser.phone ?? "" });
+      setProfile({ name: updatedUser.name, email: updatedUser.email, phone: formatWhatsapp(updatedUser.phone ?? "") });
       setEditingProfile(false);
       setMessage(typeof result.message === "string" ? result.message : "Seus dados foram atualizados.");
     } catch (error) {
@@ -284,7 +285,7 @@ export default function MyAccountPage() {
               <span className="account-card-label">Seu histórico</span>
               {appointmentsLoading ? <p className="account-empty">Organizando seu histórico…</p> : appointments.history.length ? <div className="account-appointment-list">{appointments.history.slice(0, 8).map((appointment) => <div className="account-appointment" key={appointment.id}><div><small>{statusLabels[appointment.status] ?? appointment.status}</small><strong>{appointment.serviceName ?? "Atendimento no studio"}</strong><span>{dateLabel(appointment.appointmentDate)} · {appointment.startTime}</span><span>{appointment.professionalName ?? "Profissional do studio"} · {money(appointment.totalEstimatedCents)}</span></div></div>)}</div> : <><h2>Os momentos que<br /><em>já vivemos juntas.</em></h2><p className="account-empty">Seu histórico aparecerá aqui depois do primeiro atendimento.</p></>}
             </article>
-            <article className="account-card account-profile-card"><span className="account-card-label">Seus dados</span>{editingProfile ? <form className="account-profile-form" onSubmit={saveProfile}><label>Nome completo<input value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} required maxLength={120} /></label><label>E-mail<input type="email" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} required maxLength={160} /></label><label>WhatsApp<input value={profile.phone} onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))} required maxLength={30} inputMode="tel" /></label><div className="account-profile-actions"><button className="button button-gold" type="submit" disabled={profileSaving}>{profileSaving ? "Salvando…" : "Salvar dados"}</button><button className="text-button" type="button" onClick={() => { setEditingProfile(false); setProfile({ name: user.name, email: user.email, phone: user.phone ?? "" }); }}>Cancelar</button></div></form> : <><strong>{user.name}</strong><p>{user.email}<br />{user.phone ?? "Telefone não informado"}</p><button className="text-button" type="button" onClick={() => setEditingProfile(true)}>Editar meus dados</button></>}</article>
+            <article className="account-card account-profile-card"><span className="account-card-label">Seus dados</span>{editingProfile ? <form className="account-profile-form" onSubmit={saveProfile}><label>Nome completo<input value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} required maxLength={120} /></label><label>E-mail<input type="email" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} required maxLength={160} /></label><label>WhatsApp<input value={profile.phone} onChange={(event) => setProfile((current) => ({ ...current, phone: formatWhatsapp(event.target.value) }))} required maxLength={15} inputMode="tel" autoComplete="tel" placeholder="(85) 99999-0000" /></label><div className="account-profile-actions"><button className="button button-gold" type="submit" disabled={profileSaving}>{profileSaving ? "Salvando…" : "Salvar dados"}</button><button className="text-button" type="button" onClick={() => { setEditingProfile(false); setProfile({ name: user.name, email: user.email, phone: formatWhatsapp(user.phone ?? "") }); }}>Cancelar</button></div></form> : <><strong>{user.name}</strong><p>{user.email}<br />{user.phone ? formatWhatsapp(user.phone) : "WhatsApp não informado"}</p><button className="text-button" type="button" onClick={() => setEditingProfile(true)}>Editar meus dados</button></>}</article>
             <article className="account-card loyalty-account-card"><span className="account-card-label">Sua fidelidade</span><div className="loyalty-account-numbers"><div><strong>{loyalty.account.points}</strong><small>pontos</small></div><div><strong>{loyalty.account.stamps}</strong><small>carimbos</small></div><div><strong>{loyalty.account.referrals}</strong><small>indicações</small></div></div>{loyalty.history[0] ? <p>Último movimento: {loyalty.history[0].description}</p> : <p>Seus benefícios aparecerão aqui após os atendimentos.</p>}<a className="text-link" href="/promocoes">Ver promoções ativas <span>→</span></a></article>
             <article className="account-card account-notifications-card"><span className="account-card-label">Notificações</span>{accountNotifications.length ? <><div className="account-notification-list">{accountNotifications.slice(0, 5).map((item) => <div className={item.readAt ? "" : "unread"} key={item.id}><strong>{item.title}</strong><p>{item.message}</p></div>)}</div>{accountNotifications.some((item) => !item.readAt) && <button className="text-button" type="button" onClick={() => void markNotificationsRead()}>Marcar como lidas</button>}</> : <p className="account-empty">Seus lembretes e confirmações aparecerão aqui.</p>}</article>
             <AccountReviews />
@@ -301,7 +302,7 @@ export default function MyAccountPage() {
             <form onSubmit={submit}>
               {mode === "register" && <label>Nome completo<input value={form.name} onChange={(event) => updateField("name", event.target.value)} autoComplete="name" required /></label>}
               <label>E-mail<input type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} autoComplete="email" required /></label>
-              {mode === "register" && <label>WhatsApp<input value={form.phone} onChange={(event) => updateField("phone", event.target.value)} autoComplete="tel" inputMode="tel" required /></label>}
+              {mode === "register" && <label>WhatsApp<input value={form.phone} onChange={(event) => updateField("phone", formatWhatsapp(event.target.value))} autoComplete="tel" inputMode="tel" maxLength={15} placeholder="(85) 99999-0000" required /></label>}
               <label>Senha<input type="password" value={form.password} onChange={(event) => updateField("password", event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required /></label>
               {mode === "login" && <a className="account-forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}
               {mode === "register" && <label>Confirme sua senha<input type="password" value={form.passwordConfirmation} onChange={(event) => updateField("passwordConfirmation", event.target.value)} autoComplete="new-password" minLength={8} required /></label>}

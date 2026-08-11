@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { clients, users } from "../../../../db/schema";
 import { createSession, hashPassword, sessionCookie } from "../../../../lib/auth";
+import { normalizeWhatsapp } from "../../../../lib/masks";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -25,11 +26,11 @@ export async function POST(request: Request) {
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+  const phone = normalizeWhatsapp(body.phone);
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || phone.replace(/\D/g, "").length < 8 || password.length < 8 || password.length > 128) {
-    return json({ message: "Informe nome, e-mail, telefone e uma senha com pelo menos 8 caracteres." }, 400);
+  if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || !phone || password.length < 8 || password.length > 128) {
+    return json({ message: "Informe nome, e-mail, WhatsApp e uma senha com pelo menos 8 caracteres." }, 400);
   }
 
   try {
