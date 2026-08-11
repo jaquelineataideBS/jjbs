@@ -122,7 +122,13 @@ Depois entre novamente e acesse `/admin`. As APIs administrativas recusam qualqu
 
 ## Recuperação de senha
 
-O login oferece **Esqueci minha senha**. A recuperação é local: o usuário informa o e-mail, continua neste site e cria uma nova senha. Nenhum e-mail é enviado. O token de uso único expira em 30 minutos e somente seu hash é armazenado no Neon.
+O login oferece **Esqueci minha senha**. O usuário recebe por e-mail um link de uso único, válido por 30 minutos, e somente o hash do token é armazenado no Neon. Configure em produção:
+
+- `NEXT_PUBLIC_SITE_URL`: endereço oficial do site, usado para montar o link;
+- `RESEND_API_KEY`: chave secreta da conta Resend;
+- `PASSWORD_RESET_FROM_EMAIL`: remetente de um domínio verificado, por exemplo `Jaqueline Beauty Studio <acesso@seudominio.com>`.
+
+No Resend, adicione um domínio próprio, publique os registros SPF e DKIM indicados e aguarde o status **Verified**. Depois de alterar variáveis na Vercel, faça um novo deploy para aplicá-las.
 
 Para uma recuperação administrativa sem alterar ou expor a senha, gere um link único no terminal:
 
