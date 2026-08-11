@@ -13,6 +13,7 @@ import ReviewsManagement from "./reviews-management";
 import SettingsManagement from "./settings-management";
 import UsersManagement from "./users-management";
 import type { Permission } from "../../lib/permissions";
+import { formatWhatsapp } from "../../lib/masks";
 
 type Appointment = {
   id: string;
@@ -353,7 +354,7 @@ export default function AdminPage() {
       id: professional.id,
       name: professional.name,
       title: professional.title ?? "",
-      phone: professional.phone ?? "",
+      phone: formatWhatsapp(professional.phone ?? ""),
       active: professional.active,
       serviceIds:
         schedule?.relations
@@ -786,16 +787,19 @@ export default function AdminPage() {
                     />
                   </label>
                   <label>
-                    Telefone (interno)
+                    WhatsApp
                     <input
                       value={professionalForm.phone}
                       onChange={(event) =>
                         setProfessionalForm((current) => ({
                           ...current,
-                          phone: event.target.value,
+                          phone: formatWhatsapp(event.target.value),
                         }))
                       }
-                      maxLength={30}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      maxLength={15}
+                      placeholder="(85) 99999-0000"
                     />
                   </label>
                   <fieldset className="admin-service-checks">

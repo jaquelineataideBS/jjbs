@@ -1,6 +1,162 @@
 "use client";
+
 /* eslint-disable react-hooks/set-state-in-effect -- configurações protegidas são carregadas após autenticação. */
-import {FormEvent,useEffect,useState} from "react";
-type Settings={salonName:string;logoUrl:string|null;address:string|null;phone:string|null;whatsapp:string|null;instagram:string|null;cancellationHours:number;depositPercent:number;toleranceMinutes:number;rescheduleAllowed:boolean;noShowBlockThreshold:number;noShowBlockDays:number;cancellationPolicy:string;privacyPolicy:string;homepageHeadline:string|null;homepageDescription:string|null;bannerImageUrl:string|null;primaryColor:string;accentColor:string};
-type Entry={id:string;name:string;phone:string;desiredDate:string;period:string;notes:string|null;status:string;serviceName:string;professionalName:string|null};const defaults:Settings={salonName:"Jaqueline Justino Beauty Studio",logoUrl:null,address:null,phone:null,whatsapp:null,instagram:null,cancellationHours:24,depositPercent:0,toleranceMinutes:15,rescheduleAllowed:true,noShowBlockThreshold:3,noShowBlockDays:30,cancellationPolicy:"Cancelamentos e reagendamentos devem ser solicitados com pelo menos 24 horas de antecedência.",privacyPolicy:"Seus dados são utilizados apenas para atendimento, agendamento e comunicação autorizada com o studio.",homepageHeadline:null,homepageDescription:null,bannerImageUrl:null,primaryColor:"#0B0B0B",accentColor:"#D4AF37"};const statusLabels:Record<string,string>={waiting:"Aguardando",contacted:"Contatada",booked:"Agendada",cancelled:"Cancelada"};
-export default function SettingsManagement(){const [form,setForm]=useState<Settings>(defaults);const [entries,setEntries]=useState<Entry[]>([]);const [feedback,setFeedback]=useState("");const [error,setError]=useState("");const [saving,setSaving]=useState(false);async function load(){const [s,w]=await Promise.all([fetch("/api/admin/settings",{cache:"no-store"}),fetch("/api/admin/waitlist",{cache:"no-store"})]);const sp=await s.json(),wp=await w.json();if(!s.ok)throw new Error(sp.message);if(!w.ok)throw new Error(wp.message);setForm(sp.settings??defaults);setEntries(wp.entries??[]);}useEffect(()=>{load().catch(e=>setError(e.message));},[]);async function submit(e:FormEvent){e.preventDefault();setSaving(true);const r=await fetch("/api/admin/settings",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const p=await r.json();setSaving(false);if(!r.ok){setError(p.message);return;}setFeedback(p.message);setForm(p.settings);}async function updateEntry(id:string,status:string){const r=await fetch("/api/admin/waitlist",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});const p=await r.json();if(!r.ok){setError(p.message);return;}setFeedback(p.message);await load();}return <section className="settings-module"><div className="admin-panel-heading"><div><span>Operação e LGPD</span><h2>Configurações do studio</h2></div><p>Dados públicos, regras de cancelamento, privacidade e identidade.</p></div>{feedback&&<p className="admin-feedback">{feedback}</p>}{error&&<p className="admin-feedback error">{error}</p>}<div className="settings-layout"><form className="admin-service-form" onSubmit={submit}><div className="finance-form-title"><span>Dados públicos</span><h3>Identidade e contato</h3></div><label>Nome do studio<input value={form.salonName} onChange={e=>setForm({...form,salonName:e.target.value})} /></label><label>Endereço<input value={form.address??""} onChange={e=>setForm({...form,address:e.target.value})} /></label><div className="admin-form-grid"><label>Telefone<input value={form.phone??""} onChange={e=>setForm({...form,phone:e.target.value})} /></label><label>WhatsApp<input value={form.whatsapp??""} onChange={e=>setForm({...form,whatsapp:e.target.value})} /></label></div><label>Instagram<input value={form.instagram??""} onChange={e=>setForm({...form,instagram:e.target.value})} /></label><div className="finance-form-title"><span>Regras</span><h3>Cancelamento e sinal</h3></div><div className="admin-form-grid"><label>Antecedência (horas)<input type="number" value={form.cancellationHours} onChange={e=>setForm({...form,cancellationHours:Number(e.target.value)})} /></label><label>Sinal (%)<input type="number" value={form.depositPercent} onChange={e=>setForm({...form,depositPercent:Number(e.target.value)})} /></label><label>Tolerância (min)<input type="number" value={form.toleranceMinutes} onChange={e=>setForm({...form,toleranceMinutes:Number(e.target.value)})} /></label><label>Faltas para bloqueio<input type="number" value={form.noShowBlockThreshold} onChange={e=>setForm({...form,noShowBlockThreshold:Number(e.target.value)})} /></label></div><label>Política de cancelamento<textarea value={form.cancellationPolicy} onChange={e=>setForm({...form,cancellationPolicy:e.target.value})} /></label><label>Política de privacidade<textarea value={form.privacyPolicy} onChange={e=>setForm({...form,privacyPolicy:e.target.value})} /></label><label className="admin-toggle"><input type="checkbox" checked={form.rescheduleAllowed} onChange={e=>setForm({...form,rescheduleAllowed:e.target.checked})} />Permitir reagendamento</label><button className="button button-gold" disabled={saving}><span>{saving?"Salvando...":"Salvar configurações"}</span><b>→</b></button></form><section className="admin-panel waitlist-admin"><div className="finance-toolbar"><div><span>Oportunidades</span><h3>Lista de espera</h3></div><small>{entries.filter(e=>e.status==="waiting").length} aguardando</small></div>{entries.length?entries.map(entry=><article key={entry.id}><div><span>{entry.desiredDate.split("-").reverse().join("/")} · {entry.period}</span><h4>{entry.name}</h4><p>{entry.serviceName} · {entry.phone}</p>{entry.notes&&<small>{entry.notes}</small>}</div><select value={entry.status} onChange={e=>void updateEntry(entry.id,e.target.value)}>{Object.entries(statusLabels).map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></article>):<p className="admin-empty-state">A lista de espera está vazia.</p>}</section></div></section>}
+
+import { FormEvent, useEffect, useState } from "react";
+import { formatWhatsapp } from "../../lib/masks";
+
+type Settings = {
+  salonName: string;
+  logoUrl: string | null;
+  address: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  cancellationHours: number;
+  depositPercent: number;
+  toleranceMinutes: number;
+  rescheduleAllowed: boolean;
+  noShowBlockThreshold: number;
+  noShowBlockDays: number;
+  cancellationPolicy: string;
+  privacyPolicy: string;
+  homepageHeadline: string | null;
+  homepageDescription: string | null;
+  bannerImageUrl: string | null;
+  primaryColor: string;
+  accentColor: string;
+};
+
+type Entry = {
+  id: string;
+  name: string;
+  phone: string;
+  desiredDate: string;
+  period: string;
+  notes: string | null;
+  status: string;
+  serviceName: string;
+  professionalName: string | null;
+};
+
+const defaults: Settings = {
+  salonName: "Jaqueline Justino Beauty Studio",
+  logoUrl: null,
+  address: null,
+  whatsapp: null,
+  instagram: null,
+  cancellationHours: 24,
+  depositPercent: 0,
+  toleranceMinutes: 15,
+  rescheduleAllowed: true,
+  noShowBlockThreshold: 3,
+  noShowBlockDays: 30,
+  cancellationPolicy: "Cancelamentos e reagendamentos devem ser solicitados com pelo menos 24 horas de antecedência.",
+  privacyPolicy: "Seus dados são utilizados apenas para atendimento, agendamento e comunicação autorizada com o studio.",
+  homepageHeadline: null,
+  homepageDescription: null,
+  bannerImageUrl: null,
+  primaryColor: "#0B0B0B",
+  accentColor: "#D4AF37",
+};
+
+const statusLabels: Record<string, string> = {
+  waiting: "Aguardando",
+  contacted: "Contatada",
+  booked: "Agendada",
+  cancelled: "Cancelada",
+};
+
+export default function SettingsManagement() {
+  const [form, setForm] = useState<Settings>(defaults);
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [feedback, setFeedback] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    const [settingsResponse, waitlistResponse] = await Promise.all([
+      fetch("/api/admin/settings", { cache: "no-store" }),
+      fetch("/api/admin/waitlist", { cache: "no-store" }),
+    ]);
+    const settingsPayload = await settingsResponse.json();
+    const waitlistPayload = await waitlistResponse.json();
+    if (!settingsResponse.ok) throw new Error(settingsPayload.message);
+    if (!waitlistResponse.ok) throw new Error(waitlistPayload.message);
+    setForm({ ...defaults, ...settingsPayload.settings, whatsapp: formatWhatsapp(settingsPayload.settings?.whatsapp ?? "") });
+    setEntries(waitlistPayload.entries ?? []);
+  }
+
+  useEffect(() => {
+    load().catch((loadError) => setError(loadError.message));
+  }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const response = await fetch("/api/admin/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    const payload = await response.json();
+    setSaving(false);
+    if (!response.ok) {
+      setError(payload.message);
+      return;
+    }
+    setFeedback(payload.message);
+    setForm({ ...defaults, ...payload.settings, whatsapp: formatWhatsapp(payload.settings?.whatsapp ?? "") });
+  }
+
+  async function updateEntry(id: string, status: string) {
+    const response = await fetch("/api/admin/waitlist", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.message);
+      return;
+    }
+    setFeedback(payload.message);
+    await load();
+  }
+
+  return <section className="settings-module">
+    <div className="admin-panel-heading">
+      <div><span>Operação e LGPD</span><h2>Configurações do studio</h2></div>
+      <p>Dados públicos, regras de cancelamento, privacidade e identidade.</p>
+    </div>
+    {feedback && <p className="admin-feedback">{feedback}</p>}
+    {error && <p className="admin-feedback error">{error}</p>}
+    <div className="settings-layout">
+      <form className="admin-service-form" onSubmit={submit}>
+        <div className="finance-form-title"><span>Dados públicos</span><h3>Identidade e contato</h3></div>
+        <label>Nome do studio<input value={form.salonName} onChange={(event) => setForm({ ...form, salonName: event.target.value })} /></label>
+        <label>Endereço<input value={form.address ?? ""} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label>
+        <label>WhatsApp<input value={form.whatsapp ?? ""} onChange={(event) => setForm({ ...form, whatsapp: formatWhatsapp(event.target.value) })} autoComplete="tel" inputMode="tel" maxLength={15} placeholder="(85) 99999-0000" /></label>
+        <label>Instagram<input value={form.instagram ?? ""} onChange={(event) => setForm({ ...form, instagram: event.target.value })} /></label>
+        <div className="finance-form-title"><span>Regras</span><h3>Cancelamento e sinal</h3></div>
+        <div className="admin-form-grid">
+          <label>Antecedência (horas)<input type="number" value={form.cancellationHours} onChange={(event) => setForm({ ...form, cancellationHours: Number(event.target.value) })} /></label>
+          <label>Sinal (%)<input type="number" value={form.depositPercent} onChange={(event) => setForm({ ...form, depositPercent: Number(event.target.value) })} /></label>
+          <label>Tolerância (min)<input type="number" value={form.toleranceMinutes} onChange={(event) => setForm({ ...form, toleranceMinutes: Number(event.target.value) })} /></label>
+          <label>Faltas para bloqueio<input type="number" value={form.noShowBlockThreshold} onChange={(event) => setForm({ ...form, noShowBlockThreshold: Number(event.target.value) })} /></label>
+        </div>
+        <label>Política de cancelamento<textarea value={form.cancellationPolicy} onChange={(event) => setForm({ ...form, cancellationPolicy: event.target.value })} /></label>
+        <label>Política de privacidade<textarea value={form.privacyPolicy} onChange={(event) => setForm({ ...form, privacyPolicy: event.target.value })} /></label>
+        <label className="admin-toggle"><input type="checkbox" checked={form.rescheduleAllowed} onChange={(event) => setForm({ ...form, rescheduleAllowed: event.target.checked })} />Permitir reagendamento</label>
+        <button className="button button-gold" disabled={saving}><span>{saving ? "Salvando..." : "Salvar configurações"}</span><b>→</b></button>
+      </form>
+      <section className="admin-panel waitlist-admin">
+        <div className="finance-toolbar"><div><span>Oportunidades</span><h3>Lista de espera</h3></div><small>{entries.filter((entry) => entry.status === "waiting").length} aguardando</small></div>
+        {entries.length ? entries.map((entry) => <article key={entry.id}>
+          <div><span>{entry.desiredDate.split("-").reverse().join("/")} · {entry.period}</span><h4>{entry.name}</h4><p>{entry.serviceName} · {formatWhatsapp(entry.phone)}</p>{entry.notes && <small>{entry.notes}</small>}</div>
+          <select value={entry.status} onChange={(event) => void updateEntry(entry.id, event.target.value)}>{Object.entries(statusLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select>
+        </article>) : <p className="admin-empty-state">A lista de espera está vazia.</p>}
+      </section>
+    </div>
+  </section>;
+}

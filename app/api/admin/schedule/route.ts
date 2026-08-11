@@ -3,6 +3,7 @@ import { getDb } from "../../../../db";
 import { blockedTimes, businessHours, professionalServices, professionals, services } from "../../../../db/schema";
 import { isClockTime, todayInFortaleza } from "../../../../lib/scheduling";
 import { requireAdmin } from "../../../../lib/admin";
+import { normalizeWhatsapp } from "../../../../lib/masks";
 
 type HourInput = { weekday: number; startTime: string; endTime: string; breakStart: string; breakEnd: string; active: boolean };
 
@@ -19,11 +20,12 @@ function parseProfessional(value: unknown) {
   const id = typeof value.id === "string" ? value.id.trim() : "";
   const name = typeof value.name === "string" ? value.name.trim() : "";
   const title = typeof value.title === "string" ? value.title.trim() : "";
-  const phone = typeof value.phone === "string" ? value.phone.trim() : "";
+  const phoneInput = typeof value.phone === "string" ? value.phone.trim() : "";
+  const phone = phoneInput ? normalizeWhatsapp(phoneInput) : null;
   const active = value.active !== false;
   const serviceIds = Array.isArray(value.serviceIds) ? value.serviceIds.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
-  if (!name || name.length > 120 || title.length > 120 || phone.length > 30) return null;
-  return { id, name, title: title || null, phone: phone || null, active, serviceIds: [...new Set(serviceIds)] };
+  if (!name || name.length > 120 || title.length > 120 || (phoneInput && !phone)) return null;
+  return { id, name, title: title || null, phone, active, serviceIds: [...new Set(serviceIds)] };
 }
 
 function parseHours(value: unknown): HourInput[] | null {

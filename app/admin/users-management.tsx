@@ -78,7 +78,7 @@ export default function UsersManagement() {
           <div className="finance-form-title"><span>{form.id ? "Editar acesso" : "Novo acesso"}</span><h3>{form.id ? "Atualizar usuário" : "Cadastrar usuário"}</h3></div>
           <label>Nome completo<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} maxLength={120} required /></label>
           <label>E-mail de acesso<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} maxLength={160} autoComplete="off" required /></label>
-          <label>WhatsApp<input value={form.phone} onChange={(event) => setForm({ ...form, phone: formatWhatsapp(event.target.value) })} inputMode="tel" maxLength={15} placeholder="(85) 99999-0000" required /></label>
+          <label>WhatsApp<input value={form.phone} onChange={(event) => setForm({ ...form, phone: formatWhatsapp(event.target.value) })} autoComplete="tel" inputMode="tel" maxLength={15} placeholder="(85) 99999-0000" required /></label>
           <div className="admin-form-grid">
             <label>Cargo<select value={form.role} disabled={editingSelf} onChange={(event) => setForm({ ...form, role: event.target.value as Form["role"] })}><option value="staff">Funcionário</option><option value="manager">Gestão</option><option value="admin">Administrador</option></select></label>
             <label>Status<select value={form.status} disabled={editingSelf} onChange={(event) => setForm({ ...form, status: event.target.value as Form["status"] })}><option value="active">Ativo</option><option value="inactive">Inativo</option></select></label>
