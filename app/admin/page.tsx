@@ -175,6 +175,7 @@ function responseMessage(result: unknown, fallback: string) {
 }
 
 export default function AdminPage() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [data, setData] = useState<Overview | null>(null);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [tab, setTab] = useState<
@@ -239,6 +240,10 @@ export default function AdminPage() {
       );
     }
   }
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("jaqueline-admin-theme");
+    if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
+  }, []);
   useEffect(() => {
     void load();
   }, []);
@@ -471,7 +476,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="admin-page">
+    <main className="admin-page" data-theme={theme}>
       <header className="site-header">
         <Link
           className="brand"
@@ -491,7 +496,23 @@ export default function AdminPage() {
           <Link href="/agendar">Agendamentos</Link>
           <Link href="/minha-conta">Minha conta</Link>
         </nav>
-        <span className="booking-header-label">Área administrativa</span>
+        <div className="admin-header-actions">
+          <span className="booking-header-label">Área administrativa</span>
+          <button
+            className="admin-theme-toggle"
+            type="button"
+            aria-label={`Ativar tema ${theme === "dark" ? "claro" : "escuro"}`}
+            aria-pressed={theme === "light"}
+            onClick={() => {
+              const nextTheme = theme === "dark" ? "light" : "dark";
+              setTheme(nextTheme);
+              window.localStorage.setItem("jaqueline-admin-theme", nextTheme);
+            }}
+          >
+            <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+            {theme === "dark" ? "Claro" : "Escuro"}
+          </button>
+        </div>
       </header>
       <section className="admin-shell">
         <div className="admin-heading">
