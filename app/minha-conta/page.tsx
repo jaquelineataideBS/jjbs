@@ -303,6 +303,7 @@ export default function MyAccountPage() {
               <label>E-mail<input type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} autoComplete="email" required /></label>
               {mode === "register" && <label>WhatsApp<input value={form.phone} onChange={(event) => updateField("phone", event.target.value)} autoComplete="tel" inputMode="tel" required /></label>}
               <label>Senha<input type="password" value={form.password} onChange={(event) => updateField("password", event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required /></label>
+              {mode === "login" && <a className="account-forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}
               {mode === "register" && <label>Confirme sua senha<input type="password" value={form.passwordConfirmation} onChange={(event) => updateField("passwordConfirmation", event.target.value)} autoComplete="new-password" minLength={8} required /></label>}
               <button className="button button-gold account-submit" type="submit" disabled={submitting}>{submitting ? "Aguarde..." : mode === "login" ? "Entrar na minha conta" : "Criar minha conta"} <span>↗</span></button>
             </form>

@@ -56,12 +56,16 @@ export async function verifyPassword(password: string, storedHash: string) {
   return difference === 0;
 }
 
-async function hashToken(token: string) {
+export async function hashToken(token: string) {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
 export function createSessionToken() {
+  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+export function createPasswordResetToken() {
   return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 }
 

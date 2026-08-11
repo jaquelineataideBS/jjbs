@@ -50,6 +50,25 @@ export const sessions = pgTable(
   }),
 );
 
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => ({
+    tokenUnique: uniqueIndex("password_reset_tokens_token_unique").on(table.tokenHash),
+    userIndex: index("password_reset_tokens_user_idx").on(table.userId),
+    expiryIndex: index("password_reset_tokens_expiry_idx").on(table.expiresAt),
+  }),
+);
+
 export const clients = pgTable(
   "clients",
   {

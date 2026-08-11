@@ -120,6 +120,22 @@ npm.cmd run admin:promote
 
 Depois entre novamente e acesse `/admin`. As APIs administrativas recusam qualquer conta sem `role = admin`.
 
+## Recuperação de senha
+
+O login oferece **Esqueci minha senha**. Os links são de uso único, expiram em 30 minutos e somente o hash do token é armazenado no Neon. Configure em produção:
+
+- `NEXT_PUBLIC_SITE_URL`: endereço oficial do site;
+- `RESEND_API_KEY`: chave da conta Resend;
+- `PASSWORD_RESET_FROM_EMAIL`: remetente validado, por exemplo `Jaqueline Beauty Studio <acesso@seudominio.com>`.
+
+Enquanto o envio de e-mail não estiver configurado, a administração pode gerar um link único sem alterar ou expor a senha:
+
+```powershell
+$env:RESET_EMAIL = "cliente@exemplo.com"
+$env:SITE_URL = "https://jaquelinestudio.vercel.app"
+npm.cmd run admin:password-reset
+```
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)

@@ -64,6 +64,13 @@
       "when": 1786409611299,
       "tag": "0008_sticky_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786473541981,
+      "tag": "0009_flashy_vertigo",
+      "breakpoints": true
     }
   ]
 }
