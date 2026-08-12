@@ -22,15 +22,33 @@ export default function PwaInstallInvitation() {
   const [isIos, setIsIos] = useState(false);
 
   useEffect(() => {
-    if (window.location.pathname.startsWith("/admin") || isStandalone()) return;
+    let reloadPending = false;
+    const hadController = Boolean(navigator.serviceWorker?.controller);
+    const handleControllerChange = () => {
+      if (!hadController || reloadPending) return;
+      reloadPending = true;
+      window.location.reload();
+    };
 
-    void navigator.serviceWorker?.register("/sw.js").catch(() => undefined);
+    navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
+    void navigator.serviceWorker?.register("/sw.js", { updateViaCache: "none" }).then((registration) => {
+      void registration.update();
+      registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+    }).catch(() => undefined);
+
+    if (window.location.pathname.startsWith("/admin") || isStandalone()) {
+      return () => navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+    }
 
     const isMobile = window.matchMedia("(max-width: 820px)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (!isMobile) return;
+    if (!isMobile) {
+      return () => navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+    }
 
     const dismissedAt = Number(window.localStorage.getItem(DISMISS_KEY) ?? 0);
-    if (dismissedAt && Date.now() - dismissedAt < DISMISS_FOR_MS) return;
+    if (dismissedAt && Date.now() - dismissedAt < DISMISS_FOR_MS) {
+      return () => navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+    }
 
     const iosDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const handleInstallPrompt = (event: Event) => {
@@ -52,6 +70,7 @@ export default function PwaInstallInvitation() {
     }, iosDevice ? 900 : 1400);
 
     return () => {
+      navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
       window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
       window.removeEventListener("appinstalled", handleInstalled);
       window.clearTimeout(inviteTimer);
