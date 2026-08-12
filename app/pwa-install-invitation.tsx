@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { usePublicSettings } from "./public-settings";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -12,12 +13,18 @@ const DISMISS_KEY = "jbs-pwa-install-dismissed-at";
 const DISMISS_FOR_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isStandalone() {
-  return window.matchMedia("(display-mode: standalone)").matches ||
-    ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    ("standalone" in navigator &&
+      Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
+  );
 }
 
 export default function PwaInstallInvitation() {
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const settings = usePublicSettings();
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(
+    null,
+  );
   const [show, setShow] = useState(false);
   const [isIos, setIsIos] = useState(false);
 
@@ -30,24 +37,44 @@ export default function PwaInstallInvitation() {
       window.location.reload();
     };
 
-    navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
-    void navigator.serviceWorker?.register("/sw.js", { updateViaCache: "none" }).then((registration) => {
-      void registration.update();
-      registration.waiting?.postMessage({ type: "SKIP_WAITING" });
-    }).catch(() => undefined);
+    navigator.serviceWorker?.addEventListener(
+      "controllerchange",
+      handleControllerChange,
+    );
+    void navigator.serviceWorker
+      ?.register("/sw.js", { updateViaCache: "none" })
+      .then((registration) => {
+        void registration.update();
+        registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+      })
+      .catch(() => undefined);
 
     if (window.location.pathname.startsWith("/admin") || isStandalone()) {
-      return () => navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+      return () =>
+        navigator.serviceWorker?.removeEventListener(
+          "controllerchange",
+          handleControllerChange,
+        );
     }
 
-    const isMobile = window.matchMedia("(max-width: 820px)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isMobile =
+      window.matchMedia("(max-width: 820px)").matches ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isMobile) {
-      return () => navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+      return () =>
+        navigator.serviceWorker?.removeEventListener(
+          "controllerchange",
+          handleControllerChange,
+        );
     }
 
     const dismissedAt = Number(window.localStorage.getItem(DISMISS_KEY) ?? 0);
     if (dismissedAt && Date.now() - dismissedAt < DISMISS_FOR_MS) {
-      return () => navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+      return () =>
+        navigator.serviceWorker?.removeEventListener(
+          "controllerchange",
+          handleControllerChange,
+        );
     }
 
     const iosDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -64,13 +91,19 @@ export default function PwaInstallInvitation() {
     window.addEventListener("beforeinstallprompt", handleInstallPrompt);
     window.addEventListener("appinstalled", handleInstalled);
 
-    const inviteTimer = window.setTimeout(() => {
-      setIsIos(iosDevice);
-      setShow(true);
-    }, iosDevice ? 900 : 1400);
+    const inviteTimer = window.setTimeout(
+      () => {
+        setIsIos(iosDevice);
+        setShow(true);
+      },
+      iosDevice ? 900 : 1400,
+    );
 
     return () => {
-      navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+      navigator.serviceWorker?.removeEventListener(
+        "controllerchange",
+        handleControllerChange,
+      );
       window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
       window.removeEventListener("appinstalled", handleInstalled);
       window.clearTimeout(inviteTimer);
@@ -94,16 +127,52 @@ export default function PwaInstallInvitation() {
   if (!show) return null;
 
   return (
-    <aside className="pwa-install-card" role="dialog" aria-modal="true" aria-labelledby="pwa-install-title">
-      <button className="pwa-install-close" type="button" onClick={dismiss} aria-label="Fechar convite de instalação">×</button>
+    <aside
+      className="pwa-install-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pwa-install-title"
+    >
+      <button
+        className="pwa-install-close"
+        type="button"
+        onClick={dismiss}
+        aria-label="Fechar convite de instalação"
+      >
+        ×
+      </button>
       <Image src="/pwa-icon-192.png" alt="" width={64} height={64} priority />
       <div>
-        <span>Jaqueline Beauty Studio</span>
+        <span>{settings.salonName}</span>
         <h2 id="pwa-install-title">Tenha nosso app no seu celular</h2>
-        <p>{isIos ? "Toque em Compartilhar e depois em “Adicionar à Tela de Início”." : installPrompt ? "Instale para acessar agendamentos e novidades com mais facilidade." : "Abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”."}</p>
+        <p>
+          {isIos
+            ? "Toque em Compartilhar e depois em “Adicionar à Tela de Início”."
+            : installPrompt
+              ? "Instale para acessar agendamentos e novidades com mais facilidade."
+              : "Abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”."}
+        </p>
         <div className="pwa-install-actions">
-          {installPrompt ? <button className="button button-gold" type="button" onClick={() => void install()}>Instalar app <b>→</b></button> : <button className="pwa-install-understood" type="button" onClick={dismiss}>Entendi</button>}
-          <button className="text-button" type="button" onClick={dismiss}>Agora não</button>
+          {installPrompt ? (
+            <button
+              className="button button-gold"
+              type="button"
+              onClick={() => void install()}
+            >
+              Instalar app <b>→</b>
+            </button>
+          ) : (
+            <button
+              className="pwa-install-understood"
+              type="button"
+              onClick={dismiss}
+            >
+              Entendi
+            </button>
+          )}
+          <button className="text-button" type="button" onClick={dismiss}>
+            Agora não
+          </button>
         </div>
       </div>
     </aside>

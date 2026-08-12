@@ -15,6 +15,7 @@ import SettingsManagement from "./settings-management";
 import UsersManagement from "./users-management";
 import type { Permission } from "../../lib/permissions";
 import { formatWhatsapp } from "../../lib/masks";
+import { PublicBrand } from "../public-settings";
 
 type Appointment = {
   id: string;
@@ -142,9 +143,16 @@ const emptyProfessional: ProfessionalForm = {
   active: true,
   serviceIds: [],
 };
-const blankPeriod = (id: string): WorkPeriod => ({ id, startTime: "", endTime: "" });
+const blankPeriod = (id: string): WorkPeriod => ({
+  id,
+  startTime: "",
+  endTime: "",
+});
 const defaultHours = (): DayHours[] =>
-  Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [blankPeriod(`${weekday}-new`)] }));
+  Array.from({ length: 7 }, (_, weekday) => ({
+    weekday,
+    periods: [blankPeriod(`${weekday}-new`)],
+  }));
 
 function editableHours(configured: Hours[]): DayHours[] {
   return Array.from({ length: 7 }, (_, weekday) => {
@@ -152,14 +160,30 @@ function editableHours(configured: Hours[]): DayHours[] {
       .filter((hour) => hour.weekday === weekday && hour.active)
       .sort((first, second) => first.startTime.localeCompare(second.startTime))
       .flatMap((hour, index): WorkPeriod[] => {
-        const baseId = hour.id ?? `${weekday}-${hour.startTime}-${hour.endTime}-${index}`;
-        if (hour.breakStart && hour.breakEnd && hour.startTime < hour.breakStart && hour.breakEnd < hour.endTime) {
+        const baseId =
+          hour.id ?? `${weekday}-${hour.startTime}-${hour.endTime}-${index}`;
+        if (
+          hour.breakStart &&
+          hour.breakEnd &&
+          hour.startTime < hour.breakStart &&
+          hour.breakEnd < hour.endTime
+        ) {
           return [
-            { id: `${baseId}-before`, startTime: hour.startTime, endTime: hour.breakStart },
-            { id: `${baseId}-after`, startTime: hour.breakEnd, endTime: hour.endTime },
+            {
+              id: `${baseId}-before`,
+              startTime: hour.startTime,
+              endTime: hour.breakStart,
+            },
+            {
+              id: `${baseId}-after`,
+              startTime: hour.breakEnd,
+              endTime: hour.endTime,
+            },
           ];
         }
-        return [{ id: baseId, startTime: hour.startTime, endTime: hour.endTime }];
+        return [
+          { id: baseId, startTime: hour.startTime, endTime: hour.endTime },
+        ];
       });
     return { weekday, periods: [...periods, blankPeriod(`${weekday}-new`)] };
   });
@@ -206,7 +230,17 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [tab, setTab] = useState<
-    "agenda" | "schedule" | "services" | "clients" | "portfolio" | "finance" | "marketing" | "communication" | "reviews" | "settings" | "users"
+    | "agenda"
+    | "schedule"
+    | "services"
+    | "clients"
+    | "portfolio"
+    | "finance"
+    | "marketing"
+    | "communication"
+    | "reviews"
+    | "settings"
+    | "users"
   >("agenda");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -289,7 +323,8 @@ export default function AdminPage() {
     schedule?.professionals.find(
       (item) => item.id === selectedProfessionalId,
     ) ?? null;
-  const can = (permission: Permission) => Boolean(data?.admin.permissions.includes(permission));
+  const can = (permission: Permission) =>
+    Boolean(data?.admin.permissions.includes(permission));
   const agenda = data?.appointments ?? [];
   function note(value: string, isError = false) {
     setMessage(value);
@@ -410,8 +445,17 @@ export default function AdminPage() {
   async function saveHours(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedProfessionalId) return;
-    if (hoursForm.some((day) => day.periods.some((period) => Boolean(period.startTime) !== Boolean(period.endTime)))) {
-      note("Complete a entrada e a saída de cada horário ou remova o período incompleto.", true);
+    if (
+      hoursForm.some((day) =>
+        day.periods.some(
+          (period) => Boolean(period.startTime) !== Boolean(period.endTime),
+        ),
+      )
+    ) {
+      note(
+        "Complete a entrada e a saída de cada horário ou remova o período incompleto.",
+        true,
+      );
       return;
     }
     setSaving(true);
@@ -422,9 +466,15 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: "hours",
           professionalId: selectedProfessionalId,
-          hours: hoursForm.flatMap((day) => day.periods
-            .filter((period) => period.startTime && period.endTime)
-            .map((period) => ({ weekday: day.weekday, startTime: period.startTime, endTime: period.endTime }))),
+          hours: hoursForm.flatMap((day) =>
+            day.periods
+              .filter((period) => period.startTime && period.endTime)
+              .map((period) => ({
+                weekday: day.weekday,
+                startTime: period.startTime,
+                endTime: period.endTime,
+              })),
+          ),
         }),
       });
       note("Horários de funcionamento atualizados.");
@@ -440,29 +490,41 @@ export default function AdminPage() {
       setSaving(false);
     }
   }
-  function updateWorkPeriod(weekday: number, periodId: string, field: "startTime" | "endTime", value: string) {
-    setHoursForm((current) => current.map((day) => {
-      if (day.weekday !== weekday) return day;
-      const periods = day.periods.map((period) => period.id === periodId ? { ...period, [field]: value } : period);
-      const lastPeriod = periods.at(-1);
-      if (lastPeriod?.startTime && lastPeriod.endTime) {
-        periods.push(blankPeriod(`${weekday}-${Date.now()}`));
-      }
-      return { ...day, periods };
-    }));
+  function updateWorkPeriod(
+    weekday: number,
+    periodId: string,
+    field: "startTime" | "endTime",
+    value: string,
+  ) {
+    setHoursForm((current) =>
+      current.map((day) => {
+        if (day.weekday !== weekday) return day;
+        const periods = day.periods.map((period) =>
+          period.id === periodId ? { ...period, [field]: value } : period,
+        );
+        const lastPeriod = periods.at(-1);
+        if (lastPeriod?.startTime && lastPeriod.endTime) {
+          periods.push(blankPeriod(`${weekday}-${Date.now()}`));
+        }
+        return { ...day, periods };
+      }),
+    );
   }
   function removeWorkPeriod(weekday: number, periodId: string) {
-    setHoursForm((current) => current.map((day) => {
-      if (day.weekday !== weekday) return day;
-      const periods = day.periods.filter((period) => period.id !== periodId);
-      const lastPeriod = periods.at(-1);
-      return {
-        ...day,
-        periods: !lastPeriod || lastPeriod.startTime || lastPeriod.endTime
-          ? [...periods, blankPeriod(`${weekday}-${Date.now()}`)]
-          : periods,
-      };
-    }));
+    setHoursForm((current) =>
+      current.map((day) => {
+        if (day.weekday !== weekday) return day;
+        const periods = day.periods.filter((period) => period.id !== periodId);
+        const lastPeriod = periods.at(-1);
+        return {
+          ...day,
+          periods:
+            !lastPeriod || lastPeriod.startTime || lastPeriod.endTime
+              ? [...periods, blankPeriod(`${weekday}-${Date.now()}`)]
+              : periods,
+        };
+      }),
+    );
   }
   async function saveBlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -530,19 +592,7 @@ export default function AdminPage() {
   return (
     <main className="admin-page" data-theme={theme}>
       <header className="site-header">
-        <Link
-          className="brand"
-          href="/"
-          aria-label="Jaqueline Justino Beauty Studio - início"
-        >
-          <span className="brand-symbol" aria-hidden="true">
-            <img src="/jaqueline-justino-monogram.png?v=1" alt="" />
-          </span>
-          <span className="brand-name">
-            <strong>Jaqueline Justino</strong>
-            <small>Beauty Studio</small>
-          </span>
-        </Link>
+        <PublicBrand />
         <nav className="main-nav" aria-label="Navegação principal">
           <Link href="/">Site</Link>
           <Link href="/agendar">Agendamentos</Link>
@@ -628,11 +678,13 @@ export default function AdminPage() {
                 <strong>{data.stats.clientsCount}</strong>
                 <small>base exibida no painel</small>
               </article>
-              {can("finance") && <article>
-                <span>Estimativa de hoje</span>
-                <strong>{money(data.stats.estimatedCents)}</strong>
-                <small>sem descontos aplicados</small>
-              </article>}
+              {can("finance") && (
+                <article>
+                  <span>Estimativa de hoje</span>
+                  <strong>{money(data.stats.estimatedCents)}</strong>
+                  <small>sem descontos aplicados</small>
+                </article>
+              )}
             </section>
             <div
               className="admin-tabs"
@@ -694,10 +746,38 @@ export default function AdminPage() {
               >
                 Promoções e fidelidade
               </button>
-              <button className={tab === "communication" ? "active" : ""} hidden={!can("communication")} type="button" onClick={() => setTab("communication")}>Comunicação</button>
-              <button className={tab === "reviews" ? "active" : ""} hidden={!can("reviews")} type="button" onClick={() => setTab("reviews")}>Avaliações</button>
-              <button className={tab === "settings" ? "active" : ""} hidden={!can("settings")} type="button" onClick={() => setTab("settings")}>Configurações</button>
-              <button className={tab === "users" ? "active" : ""} hidden={!can("users")} type="button" onClick={() => setTab("users")}>Usuários</button>
+              <button
+                className={tab === "communication" ? "active" : ""}
+                hidden={!can("communication")}
+                type="button"
+                onClick={() => setTab("communication")}
+              >
+                Comunicação
+              </button>
+              <button
+                className={tab === "reviews" ? "active" : ""}
+                hidden={!can("reviews")}
+                type="button"
+                onClick={() => setTab("reviews")}
+              >
+                Avaliações
+              </button>
+              <button
+                className={tab === "settings" ? "active" : ""}
+                hidden={!can("settings")}
+                type="button"
+                onClick={() => setTab("settings")}
+              >
+                Configurações
+              </button>
+              <button
+                className={tab === "users" ? "active" : ""}
+                hidden={!can("users")}
+                type="button"
+                onClick={() => setTab("users")}
+              >
+                Usuários
+              </button>
             </div>
             {tab === "agenda" && (
               <section className="admin-panel">
@@ -951,46 +1031,92 @@ export default function AdminPage() {
                             </h2>
                           </div>
                           <p>
-                            Escreva a entrada e a saída. Ao completar um período,
-                            outro campo aparece para você acrescentar mais um horário.
+                            Escreva a entrada e a saída. Ao completar um
+                            período, outro campo aparece para você acrescentar
+                            mais um horário.
                           </p>
                         </div>
                         <div className="admin-hours-list">
                           {hoursForm.map((day) => (
-                            <section className="admin-hours-day" key={day.weekday}>
+                            <section
+                              className="admin-hours-day"
+                              key={day.weekday}
+                            >
                               <div className="admin-hours-day-heading">
                                 <strong>{weekdays[day.weekday]}</strong>
-                                <small>{day.periods.some((period) => period.startTime && period.endTime) ? "Dia com atendimento" : "Folga"}</small>
+                                <small>
+                                  {day.periods.some(
+                                    (period) =>
+                                      period.startTime && period.endTime,
+                                  )
+                                    ? "Dia com atendimento"
+                                    : "Folga"}
+                                </small>
                               </div>
                               <div className="admin-hours-periods">
                                 {day.periods.map((period, index) => (
-                                  <div className="admin-hours-period" key={period.id}>
+                                  <div
+                                    className="admin-hours-period"
+                                    key={period.id}
+                                  >
                                     <label>
                                       <span>Entrada</span>
                                       <input
                                         type="time"
                                         value={period.startTime}
                                         aria-label={`Entrada ${index + 1} de ${weekdays[day.weekday]}`}
-                                        onChange={(event) => updateWorkPeriod(day.weekday, period.id, "startTime", event.target.value)}
+                                        onChange={(event) =>
+                                          updateWorkPeriod(
+                                            day.weekday,
+                                            period.id,
+                                            "startTime",
+                                            event.target.value,
+                                          )
+                                        }
                                       />
                                     </label>
-                                    <span className="admin-hours-separator">até</span>
+                                    <span className="admin-hours-separator">
+                                      até
+                                    </span>
                                     <label>
                                       <span>Saída</span>
                                       <input
                                         type="time"
                                         value={period.endTime}
                                         aria-label={`Saída ${index + 1} de ${weekdays[day.weekday]}`}
-                                        onChange={(event) => updateWorkPeriod(day.weekday, period.id, "endTime", event.target.value)}
+                                        onChange={(event) =>
+                                          updateWorkPeriod(
+                                            day.weekday,
+                                            period.id,
+                                            "endTime",
+                                            event.target.value,
+                                          )
+                                        }
                                       />
                                     </label>
-                                    {(period.startTime || period.endTime) && day.periods.length > 1 && (
-                                      <button className="admin-hours-remove" type="button" onClick={() => removeWorkPeriod(day.weekday, period.id)} aria-label={`Remover horário ${index + 1} de ${weekdays[day.weekday]}`}>Remover</button>
-                                    )}
+                                    {(period.startTime || period.endTime) &&
+                                      day.periods.length > 1 && (
+                                        <button
+                                          className="admin-hours-remove"
+                                          type="button"
+                                          onClick={() =>
+                                            removeWorkPeriod(
+                                              day.weekday,
+                                              period.id,
+                                            )
+                                          }
+                                          aria-label={`Remover horário ${index + 1} de ${weekdays[day.weekday]}`}
+                                        >
+                                          Remover
+                                        </button>
+                                      )}
                                   </div>
                                 ))}
                               </div>
-                              <p>Preencha entrada e saída. Um novo horário aparecerá automaticamente.</p>
+                              <p>
+                                Preencha entrada e saída. Um novo horário
+                                aparecerá automaticamente.
+                              </p>
                             </section>
                           ))}
                         </div>
@@ -1129,155 +1255,157 @@ export default function AdminPage() {
               <section className="admin-services-layout">
                 <div className="admin-service-stack">
                   <CategoryManagement onChanged={() => void load()} />
-                <form className="admin-service-form" onSubmit={saveService}>
-                  <div className="admin-panel-heading">
-                    <div>
-                      <span>
-                        {serviceForm.id ? "Editar serviço" : "Novo serviço"}
-                      </span>
-                      <h2>
-                        {serviceForm.id
-                          ? "Atualize os detalhes."
-                          : "Cadastre um serviço."}
-                      </h2>
+                  <form className="admin-service-form" onSubmit={saveService}>
+                    <div className="admin-panel-heading">
+                      <div>
+                        <span>
+                          {serviceForm.id ? "Editar serviço" : "Novo serviço"}
+                        </span>
+                        <h2>
+                          {serviceForm.id
+                            ? "Atualize os detalhes."
+                            : "Cadastre um serviço."}
+                        </h2>
+                      </div>
+                      {serviceForm.id && (
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => setServiceForm(emptyService)}
+                        >
+                          Novo cadastro
+                        </button>
+                      )}
                     </div>
-                    {serviceForm.id && (
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() => setServiceForm(emptyService)}
-                      >
-                        Novo cadastro
-                      </button>
-                    )}
-                  </div>
-                  <label>
-                    Nome do serviço
-                    <input
-                      value={serviceForm.name}
-                      onChange={(event) =>
-                        setServiceForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                      required
-                      maxLength={120}
-                    />
-                  </label>
-                  <label>
-                    Categoria
-                    <select
-                      value={serviceForm.categoryId}
-                      onChange={(event) =>
-                        setServiceForm((current) => ({
-                          ...current,
-                          categoryId: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Sem categoria</option>
-                      {data.categories.map((category) => (
-                        <option value={category.id} key={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Descrição
-                    <textarea
-                      value={serviceForm.description}
-                      onChange={(event) =>
-                        setServiceForm((current) => ({
-                          ...current,
-                          description: event.target.value,
-                        }))
-                      }
-                      required
-                      maxLength={1000}
-                      rows={4}
-                    />
-                  </label>
-                  <div className="admin-form-grid">
                     <label>
-                      Duração (minutos)
+                      Nome do serviço
                       <input
-                        type="number"
-                        min="15"
-                        max="720"
-                        step="15"
-                        value={serviceForm.durationMinutes}
+                        value={serviceForm.name}
                         onChange={(event) =>
                           setServiceForm((current) => ({
                             ...current,
-                            durationMinutes: event.target.value,
+                            name: event.target.value,
                           }))
                         }
                         required
+                        maxLength={120}
                       />
                     </label>
                     <label>
-                      Tipo de preço
+                      Categoria
                       <select
-                        value={serviceForm.priceType}
+                        value={serviceForm.categoryId}
                         onChange={(event) =>
                           setServiceForm((current) => ({
                             ...current,
-                            priceType: event.target.value,
-                            price:
-                              event.target.value === "consultation"
-                                ? ""
-                                : current.price,
+                            categoryId: event.target.value,
                           }))
                         }
                       >
-                        <option value="fixed">Valor fixo</option>
-                        <option value="starting_at">A partir de</option>
-                        <option value="consultation">Sob consulta</option>
+                        <option value="">Sem categoria</option>
+                        {data.categories.map((category) => (
+                          <option value={category.id} key={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
                       </select>
                     </label>
-                  </div>
-                  {serviceForm.priceType !== "consultation" && (
                     <label>
-                      Valor (R$)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={serviceForm.price}
+                      Descrição
+                      <textarea
+                        value={serviceForm.description}
                         onChange={(event) =>
                           setServiceForm((current) => ({
                             ...current,
-                            price: event.target.value,
+                            description: event.target.value,
                           }))
                         }
                         required
+                        maxLength={1000}
+                        rows={4}
                       />
                     </label>
-                  )}
-                  <label className="admin-toggle">
-                    <input
-                      type="checkbox"
-                      checked={serviceForm.active}
-                      onChange={(event) =>
-                        setServiceForm((current) => ({
-                          ...current,
-                          active: event.target.checked,
-                        }))
-                      }
-                    />{" "}
-                    Serviço disponível para agendamento
-                  </label>
-                  <button
-                    className="button button-gold"
-                    type="submit"
-                    disabled={saving}
-                  >
-                    {serviceForm.id ? "Salvar alterações" : "Cadastrar serviço"}
-                    <span>↗</span>
-                  </button>
-                </form>
+                    <div className="admin-form-grid">
+                      <label>
+                        Duração (minutos)
+                        <input
+                          type="number"
+                          min="15"
+                          max="720"
+                          step="15"
+                          value={serviceForm.durationMinutes}
+                          onChange={(event) =>
+                            setServiceForm((current) => ({
+                              ...current,
+                              durationMinutes: event.target.value,
+                            }))
+                          }
+                          required
+                        />
+                      </label>
+                      <label>
+                        Tipo de preço
+                        <select
+                          value={serviceForm.priceType}
+                          onChange={(event) =>
+                            setServiceForm((current) => ({
+                              ...current,
+                              priceType: event.target.value,
+                              price:
+                                event.target.value === "consultation"
+                                  ? ""
+                                  : current.price,
+                            }))
+                          }
+                        >
+                          <option value="fixed">Valor fixo</option>
+                          <option value="starting_at">A partir de</option>
+                          <option value="consultation">Sob consulta</option>
+                        </select>
+                      </label>
+                    </div>
+                    {serviceForm.priceType !== "consultation" && (
+                      <label>
+                        Valor (R$)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={serviceForm.price}
+                          onChange={(event) =>
+                            setServiceForm((current) => ({
+                              ...current,
+                              price: event.target.value,
+                            }))
+                          }
+                          required
+                        />
+                      </label>
+                    )}
+                    <label className="admin-toggle">
+                      <input
+                        type="checkbox"
+                        checked={serviceForm.active}
+                        onChange={(event) =>
+                          setServiceForm((current) => ({
+                            ...current,
+                            active: event.target.checked,
+                          }))
+                        }
+                      />{" "}
+                      Serviço disponível para agendamento
+                    </label>
+                    <button
+                      className="button button-gold"
+                      type="submit"
+                      disabled={saving}
+                    >
+                      {serviceForm.id
+                        ? "Salvar alterações"
+                        : "Cadastrar serviço"}
+                      <span>↗</span>
+                    </button>
+                  </form>
                 </div>
                 <section className="admin-panel">
                   <div className="admin-panel-heading">

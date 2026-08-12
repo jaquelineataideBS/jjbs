@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     if (!user) return noStore({ message: "Entre na sua conta para consultar os agendamentos." }, 401);
 
     const db = await getDb();
-    const [settings] = await db.select({ cancellationHours: salonSettings.cancellationHours }).from(salonSettings).where(eq(salonSettings.id, "studio")).limit(1);
+    const [settings] = await db.select({ cancellationHours: salonSettings.cancellationHours, rescheduleAllowed: salonSettings.rescheduleAllowed }).from(salonSettings).where(eq(salonSettings.id, "studio")).limit(1);
     const cancellationHours = settings?.cancellationHours ?? 24;
     const rows = await db.select({
       id: appointments.id,
@@ -58,6 +58,8 @@ export async function GET(request: Request) {
       isUpcoming: futureStatuses.has(appointment.status)
         && (appointment.appointmentDate > now.date || (appointment.appointmentDate === now.date && appointment.endTime > now.time)),
       canCancel: cancellableStatuses.includes(appointment.status)
+        && new Date(`${appointment.appointmentDate}T${appointment.startTime}:00-03:00`).getTime() - Date.now() >= cancellationHours * 60 * 60 * 1000,
+      canReschedule: settings?.rescheduleAllowed !== false && cancellableStatuses.includes(appointment.status)
         && new Date(`${appointment.appointmentDate}T${appointment.startTime}:00-03:00`).getTime() - Date.now() >= cancellationHours * 60 * 60 * 1000,
     }));
 

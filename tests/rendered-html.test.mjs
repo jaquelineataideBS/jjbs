@@ -36,7 +36,7 @@ test("the disposable starter preview is no longer part of the project", async ()
   ]);
 
   assert.match(page, /export default function Home/);
-  assert.match(layout, /Jaqueline Beauty Studio/);
+  assert.match(layout, /getPublicSettings/);
   assert.match(css, /--gold/);
   assert.doesNotMatch(page, /_sites-preview|SkeletonPreview|codex-preview/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));

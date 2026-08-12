@@ -5,6 +5,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
+import { whatsappHref } from "../../lib/public-links";
+import { PublicBrand, usePublicSettings } from "../public-settings";
 
 type Service = {
   id: string;
@@ -122,6 +124,7 @@ function buildDateOptions() {
 }
 
 export default function BookingPage() {
+  const settings = usePublicSettings();
   const dateOptions = useMemo(() => buildDateOptions(), []);
   const [services, setServices] = useState(fallbackServices);
   const [professionals, setProfessionals] = useState<Professional[]>([
@@ -371,19 +374,7 @@ export default function BookingPage() {
     return (
       <main className="booking-page">
         <header className="site-header">
-          <a
-            className="brand"
-            href="/"
-            aria-label="Jaqueline Beauty Studio - início"
-          >
-            <span className="brand-symbol" aria-hidden="true">
-              <img src="/jaqueline-justino-monogram.png?v=1" alt="" />
-            </span>
-            <span className="brand-name">
-              <strong>Jaqueline Justino</strong>
-              <small>Beauty Studio</small>
-            </span>
-          </a>
+          <PublicBrand />
           <a className="header-cta" href="/contato">
             Falar com o studio <span>↗</span>
           </a>
@@ -409,7 +400,7 @@ export default function BookingPage() {
             <strong>Vamos confirmar seu horário pelo WhatsApp.</strong>
             <a
               className="button button-gold"
-              href="https://wa.me/5500000000000"
+              href={whatsappHref(settings.whatsapp)}
               target="_blank"
               rel="noreferrer"
             >
@@ -426,19 +417,7 @@ export default function BookingPage() {
   return (
     <main className="booking-page">
       <header className="site-header">
-        <a
-          className="brand"
-          href="/"
-          aria-label="Jaqueline Beauty Studio - início"
-        >
-          <span className="brand-symbol" aria-hidden="true">
-            <img src="/jaqueline-justino-monogram.png?v=1" alt="" />
-          </span>
-          <span className="brand-name">
-            <strong>Jaqueline Justino</strong>
-            <small>Beauty Studio</small>
-          </span>
-        </a>
+        <PublicBrand />
         <nav className="main-nav" aria-label="Navegação principal">
           <a href="/">Início</a>
           <a href="/servicos">Serviços</a>
@@ -721,9 +700,10 @@ export default function BookingPage() {
                   />
                   <span>
                     Li e aceito a{" "}
-                    <a href="/contato">política de cancelamento</a> do studio.
+                    <a href="/contato">política de cancelamento</a> de {settings.salonName}.
                   </span>
                 </label>
+                <p className="booking-policy-copy">{settings.cancellationPolicy}</p>
               </div>
             )}
             {error && (
@@ -786,7 +766,7 @@ export default function BookingPage() {
               <span>✦</span>
               <p>
                 Se o serviço precisar de avaliação, a equipe confirma os
-                detalhes com você antes de reservar.
+                detalhes com você antes de reservar. {settings.depositPercent > 0 ? `Para confirmar, o sinal é de ${settings.depositPercent}%. ` : ""}A tolerância de atraso é de {settings.toleranceMinutes} minutos.
               </p>
             </div>
           </aside>

@@ -74,7 +74,7 @@ export default function SettingsManagement() {
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState<"logoUrl" | "bannerImageUrl" | null>(null);
 
   async function load() {
     const [settingsResponse, waitlistResponse] = await Promise.all([
@@ -135,13 +135,13 @@ export default function SettingsManagement() {
     await load();
   }
 
-  async function uploadBanner(file: File | undefined) {
+  async function uploadImage(field: "logoUrl" | "bannerImageUrl", file: File | undefined) {
     if (!file) return;
     if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 4 * 1024 * 1024) {
       setError("Escolha uma imagem JPEG ou PNG de até 4 MB.");
       return;
     }
-    setUploadingBanner(true);
+    setUploadingImage(field);
     setError("");
     const data = new FormData();
     data.append("file", file);
@@ -149,12 +149,12 @@ export default function SettingsManagement() {
       const response = await fetch("/api/admin/media", { method: "POST", body: data });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message);
-      setForm((current) => ({ ...current, bannerImageUrl: payload.imageUrl }));
-      setFeedback("Imagem carregada. Clique em salvar configurações para publicar na página inicial.");
+      setForm((current) => ({ ...current, [field]: payload.imageUrl }));
+      setFeedback("Imagem carregada. Clique em salvar configurações para publicar em todas as páginas.");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Não foi possível enviar a imagem.");
     } finally {
-      setUploadingBanner(false);
+      setUploadingImage(null);
     }
   }
 
@@ -218,6 +218,11 @@ export default function SettingsManagement() {
               }
             />
           </label>
+          <label>
+            Logo do studio (JPEG ou PNG)
+            <input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={uploadingImage !== null} onChange={(event) => void uploadImage("logoUrl", event.target.files?.[0])} />
+            {form.logoUrl && <img className="settings-logo-preview" src={form.logoUrl} alt="Prévia da logo" />}
+          </label>
           <div className="finance-form-title">
             <span>Página inicial</span>
             <h3>Apresentação pública</h3>
@@ -232,7 +237,7 @@ export default function SettingsManagement() {
           </label>
           <label>
             Foto de capa (JPEG ou PNG)
-            <input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={uploadingBanner} onChange={(event) => void uploadBanner(event.target.files?.[0])} />
+            <input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={uploadingImage !== null} onChange={(event) => void uploadImage("bannerImageUrl", event.target.files?.[0])} />
             {form.bannerImageUrl && <img className="settings-banner-preview" src={form.bannerImageUrl} alt="Prévia da capa" />}
           </label>
           <div className="admin-form-grid">

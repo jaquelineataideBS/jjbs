@@ -3,6 +3,7 @@ import { getDb } from "../../../../db";
 import { auditLogs, salonSettings } from "../../../../db/schema";
 import { requireAdmin } from "../../../../lib/admin";
 import { normalizeWhatsapp } from "../../../../lib/masks";
+import { validStoredImagePath } from "../../../../lib/image-files";
 
 function noStore(data: Record<string, unknown>, status = 200) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -46,6 +47,8 @@ export async function PATCH(request: Request) {
     const toleranceMinutes = Number(body.toleranceMinutes);
     const noShowBlockThreshold = Number(body.noShowBlockThreshold);
     const noShowBlockDays = Number(body.noShowBlockDays);
+    const logoUrl = text(body.logoUrl, 500);
+    const bannerImageUrl = text(body.bannerImageUrl, 500);
 
     if (
       !salonName ||
@@ -56,13 +59,15 @@ export async function PATCH(request: Request) {
       cancellationHours < 0 || cancellationHours > 720 ||
       depositPercent < 0 || depositPercent > 100 ||
       toleranceMinutes < 0 || toleranceMinutes > 180
+      || (logoUrl && !validStoredImagePath(logoUrl))
+      || (bannerImageUrl && !validStoredImagePath(bannerImageUrl))
     ) {
       return noStore({ message: "Revise o WhatsApp, as regras e os prazos do studio." }, 400);
     }
 
     const values = {
       salonName,
-      logoUrl: text(body.logoUrl, 500),
+      logoUrl,
       address: text(body.address, 500),
       whatsapp,
       instagram: text(body.instagram, 200),
@@ -76,7 +81,7 @@ export async function PATCH(request: Request) {
       privacyPolicy,
       homepageHeadline: text(body.homepageHeadline, 240),
       homepageDescription: text(body.homepageDescription, 1000),
-      bannerImageUrl: text(body.bannerImageUrl, 500),
+      bannerImageUrl,
       primaryColor: typeof body.primaryColor === "string" && /^#[0-9a-f]{6}$/i.test(body.primaryColor) ? body.primaryColor : "#0B0B0B",
       accentColor: typeof body.accentColor === "string" && /^#[0-9a-f]{6}$/i.test(body.accentColor) ? body.accentColor : "#D4AF37",
       updatedBy: admin.id,

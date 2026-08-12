@@ -22,7 +22,7 @@ test("cupom e desconto ficam vinculados ao agendamento", async () => {
 
 test("página inicial lê configurações e conteúdo público do banco", async () => {
   const page = await readFile(new URL("app/page.tsx", root), "utf8");
-  assert.match(page, /from\(salonSettings\)/);
+  assert.match(page, /getPublicSettings/);
   assert.match(page, /settings\.homepageHeadline/);
   assert.match(page, /settings\.bannerImageUrl/);
   assert.match(page, /settings\.whatsapp/);

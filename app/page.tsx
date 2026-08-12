@@ -2,7 +2,9 @@ import ReviewsHighlight from "./reviews-highlight";
 import type { CSSProperties } from "react";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../db";
-import { portfolioItems, salonSettings, serviceCategories, services as serviceTable } from "../db/schema";
+import { portfolioItems, serviceCategories, services as serviceTable } from "../db/schema";
+import { defaultPublicSettings, getPublicSettings } from "../lib/public-settings";
+import { instagramHref, whatsappHref } from "../lib/public-links";
 
 export const dynamic = "force-dynamic";
 
@@ -54,49 +56,35 @@ const fallbackPortfolio = [
   },
 ];
 
-const fallbackSettings = {
-  salonName: "Jaqueline Justino Beauty Studio",
-  address: "Rua da Beleza, 120 · Fortaleza · CE",
-  whatsapp: "5585999990000",
-  instagram: "",
-  homepageHeadline: "Seu cabelo, sua assinatura.",
-  homepageDescription: "Um studio para viver o cuidado com calma, técnica e um olhar que enxerga a sua beleza de verdade.",
-  bannerImageUrl: "/jaqueline-justino-hero.png",
-  primaryColor: "#0B0B0B",
-  accentColor: "#D4AF37",
-};
+const fallbackHeadline = "Seu cabelo, sua assinatura.";
+const fallbackDescription = "Um studio para viver o cuidado com calma, técnica e um olhar que enxerga a sua beleza de verdade.";
 
 async function homepageData() {
   try {
     const db = await getDb();
-    const [settingsRows, serviceRows, portfolioRows] = await Promise.all([
-      db.select().from(salonSettings).where(eq(salonSettings.id, "studio")).limit(1),
+    const [settings, serviceRows, portfolioRows] = await Promise.all([
+      getPublicSettings(),
       db.select({ id: serviceTable.id, name: serviceTable.name, description: serviceTable.description, durationMinutes: serviceTable.durationMinutes, priceCents: serviceTable.priceCents, priceType: serviceTable.priceType, category: serviceCategories.name })
         .from(serviceTable).leftJoin(serviceCategories, eq(serviceCategories.id, serviceTable.categoryId)).where(eq(serviceTable.active, true)).orderBy(asc(serviceCategories.displayOrder), asc(serviceTable.name)).limit(3),
       db.select({ id: portfolioItems.id, image: portfolioItems.mainImageUrl, category: portfolioItems.category, title: portfolioItems.title })
         .from(portfolioItems).where(and(eq(portfolioItems.published, true), eq(portfolioItems.featured, true))).orderBy(asc(portfolioItems.displayOrder)).limit(3),
     ]);
-    const settings = { ...fallbackSettings, ...(settingsRows[0] ?? {}) };
     return {
       settings,
       services: serviceRows.length ? serviceRows.map((service, index) => ({ number: String(index + 1).padStart(2, "0"), name: service.name, description: service.description, duration: service.durationMinutes < 60 ? `${service.durationMinutes} min` : `${Math.floor(service.durationMinutes / 60)}h${service.durationMinutes % 60 ? String(service.durationMinutes % 60).padStart(2, "0") : ""}`, price: service.priceCents === null ? "Sob consulta" : `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.priceCents / 100)}` })) : fallbackServices,
       portfolio: portfolioRows.length ? portfolioRows : fallbackPortfolio,
     };
   } catch {
-    return { settings: fallbackSettings, services: fallbackServices, portfolio: fallbackPortfolio };
+    return { settings: defaultPublicSettings, services: fallbackServices, portfolio: fallbackPortfolio };
   }
-}
-
-function whatsappHref(value: string | null | undefined) {
-  const digits = value?.replace(/\D/g, "") ?? "";
-  return digits ? `https://wa.me/${digits.startsWith("55") ? digits : `55${digits}`}` : "#contato";
 }
 
 async function Homepage() {
   const { settings, services, portfolio } = await homepageData();
   const whatsapp = whatsappHref(settings.whatsapp);
   const studioParts = settings.salonName.replace(/Beauty Studio$/i, "").trim();
-  const heroImage = settings.bannerImageUrl || fallbackSettings.bannerImageUrl;
+  const heroImage = settings.bannerImageUrl || "/jaqueline-justino-hero.png";
+  const logoImage = settings.logoUrl || "/jaqueline-justino-monogram.png?v=1";
   return (
     <main style={{ "--black": settings.primaryColor, "--gold": settings.accentColor } as CSSProperties}>
       <header className="site-header">
@@ -106,7 +94,7 @@ async function Homepage() {
           aria-label={`${settings.salonName} - início`}
         >
           <span className="brand-symbol" aria-hidden="true">
-            <img src="/jaqueline-justino-monogram.png?v=1" alt="" />
+            <img src={logoImage} alt="" />
           </span>
           <span className="brand-name">
             <strong>{studioParts}</strong>
@@ -133,8 +121,8 @@ async function Homepage() {
           <p className="eyebrow">
             Beleza com intenção <span>✦</span>
           </p>
-          <h1>{settings.homepageHeadline || fallbackSettings.homepageHeadline}</h1>
-          <p className="hero-text">{settings.homepageDescription || fallbackSettings.homepageDescription}</p>
+          <h1>{settings.homepageHeadline || fallbackHeadline}</h1>
+          <p className="hero-text">{settings.homepageDescription || fallbackDescription}</p>
           <div className="hero-actions">
             <a className="button button-gold" href="/agendar">
               Agendar meu horário <span>↗</span>
@@ -177,7 +165,7 @@ async function Homepage() {
             aria-label={settings.salonName}
           >
             <span className="hero-stamp-symbol" aria-hidden="true">
-              <img src="/jaqueline-justino-monogram.png?v=1" alt="" />
+              <img src={logoImage} alt="" />
             </span>
           </div>
         </div>
@@ -367,7 +355,7 @@ async function Homepage() {
           <div>
             <a className="brand footer-brand" href="#inicio">
               <span className="brand-symbol" aria-hidden="true">
-                <img src="/jaqueline-justino-monogram.png?v=1" alt="" />
+                <img src={logoImage} alt="" />
               </span>
               <span className="brand-name">
                 <strong>{studioParts}</strong>
@@ -395,7 +383,7 @@ async function Homepage() {
           <div className="footer-column">
             <span>Redes</span>
             <p>
-              <a href={settings.instagram || "#contato"} target={settings.instagram ? "_blank" : undefined} rel={settings.instagram ? "noreferrer" : undefined}>Instagram ↗</a>
+              <a href={instagramHref(settings.instagram)} target="_blank" rel="noreferrer">Instagram ↗</a>
               <br />
               <a href={whatsapp}>WhatsApp ↗</a>
             </p>

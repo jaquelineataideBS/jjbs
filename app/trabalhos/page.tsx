@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element, @next/next/no-html-link-for-pages -- o preview público preserva os links nativos do layout existente. */
 
 import { useEffect, useMemo, useState } from "react";
+import { PublicBrand, PublicStudioName } from "../public-settings";
 
 type WorkItem = {
   id: string;
@@ -74,19 +75,7 @@ export default function WorksPage() {
   return (
     <main className="works-page">
       <header className="site-header">
-        <a
-          className="brand"
-          href="/"
-          aria-label="Jaqueline Justino Beauty Studio - início"
-        >
-          <span className="brand-symbol" aria-hidden="true">
-            <img src="/jaqueline-justino-monogram.png?v=1" alt="" />
-          </span>
-          <span className="brand-name">
-            <strong>Jaqueline Justino</strong>
-            <small>Beauty Studio</small>
-          </span>
-        </a>
+        <PublicBrand />
         <nav className="main-nav" aria-label="Navegação principal">
           <a href="/">Início</a>
           <a href="/servicos">Serviços</a>
@@ -114,7 +103,7 @@ export default function WorksPage() {
           </h1>
           <p>
             Uma seleção de transformações, detalhes e momentos vividos no
-            Jaqueline Beauty Studio.
+            <PublicStudioName />.
           </p>
         </div>
         <div className="works-hero-note">
@@ -210,7 +199,7 @@ export default function WorksPage() {
       </section>
       <footer className="site-footer">
         <div className="footer-bottom">
-          <span>© 2026 Jaqueline Beauty Studio</span>
+          <span>© 2026 <PublicStudioName /></span>
           <span>Seg–Sáb · 09h às 19h</span>
           <a href="#top">Voltar ao topo ↑</a>
         </div>

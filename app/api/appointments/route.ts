@@ -4,6 +4,7 @@ import { appointmentServices, appointments, blockedTimes, businessHours, clients
 import { getCurrentUser } from "../../../lib/auth";
 import { normalizeWhatsapp } from "../../../lib/masks";
 import { normalizeCoupon, validateCoupon } from "../../../lib/promotions";
+import { getPublicSettings } from "../../../lib/public-settings";
 import { addMinutes, isClockTime, rangesOverlap, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const blockedStatuses = ["cancelled_by_client", "cancelled_by_salon"];
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
   try {
     const db = await getDb();
     const currentUser = await getCurrentUser(request);
+    const settings = await getPublicSettings();
     const nowTime = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Fortaleza", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
     const [rescheduledAppointment] = payload.rescheduleId && currentUser
       ? await db.select({ id: appointments.id, clientId: appointments.clientId, appointmentDate: appointments.appointmentDate, startTime: appointments.startTime, status: appointments.status })
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
         .limit(1)
       : [];
     if (payload.rescheduleId && !currentUser) return json({ message: "Entre na sua conta para reagendar um atendimento." }, 401);
+    if (payload.rescheduleId && !settings.rescheduleAllowed) return json({ message: "O reagendamento pela área da cliente está desativado. Fale com o studio." }, 409);
     if (payload.rescheduleId && !rescheduledAppointment) return json({ message: "O agendamento original não foi encontrado na sua conta." }, 404);
     if (rescheduledAppointment && (!["pending_confirmation", "confirmed"].includes(rescheduledAppointment.status)
       || rescheduledAppointment.appointmentDate < todayInFortaleza()
