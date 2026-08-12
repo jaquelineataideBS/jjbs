@@ -18,6 +18,11 @@ export function rangesOverlap(first: TimeRange, second: TimeRange) {
   return first.startTime < second.endTime && first.endTime > second.startTime;
 }
 
+export function hasOverlappingRanges(ranges: TimeRange[]) {
+  const ordered = [...ranges].sort((first, second) => first.startTime.localeCompare(second.startTime));
+  return ordered.some((range, index) => index > 0 && ordered[index - 1].endTime > range.startTime);
+}
+
 export function weekdayForDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day).getDay();

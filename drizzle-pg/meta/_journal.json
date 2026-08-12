@@ -78,6 +78,27 @@
       "when": 1786491218719,
       "tag": "0010_illegal_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786494512273,
+      "tag": "0011_spotty_lake",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786496206366,
+      "tag": "0012_thick_mad_thinker",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786497488044,
+      "tag": "0013_known_robbie_robertson",
+      "breakpoints": true
     }
   ]
 }

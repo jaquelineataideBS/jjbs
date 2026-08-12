@@ -217,6 +217,22 @@ export const portfolioItems = pgTable(
   }),
 );
 
+export const mediaAssets = pgTable(
+  "media_assets",
+  {
+    id: text("id").primaryKey(),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    dataBase64: text("data_base64").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (table) => ({
+    createdAtIndex: index("media_assets_created_at_idx").on(table.createdAt),
+  }),
+);
+
 export const professionalServices = pgTable(
   "professional_services",
   {
@@ -260,8 +276,8 @@ export const businessHours = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => ({
-    professionalWeekdayUnique: uniqueIndex(
-      "business_hours_professional_weekday_unique",
+    professionalWeekdayIndex: index(
+      "business_hours_professional_weekday_idx",
     ).on(table.professionalId, table.weekday),
     professionalIndex: index("business_hours_professional_idx").on(
       table.professionalId,
@@ -322,6 +338,9 @@ export const appointments = pgTable(
     endTime: text("end_time").notNull(),
     status: text("status").notNull().default("pending_confirmation"),
     totalEstimatedCents: integer("total_estimated_cents"),
+    promotionId: text("promotion_id"),
+    couponCode: text("coupon_code"),
+    discountCents: integer("discount_cents").notNull().default(0),
     notesClient: text("notes_client"),
     source: text("source").notNull().default("website"),
     createdAt: createdAt(),
@@ -329,6 +348,7 @@ export const appointments = pgTable(
   },
   (table) => ({
     dateIndex: index("appointments_date_idx").on(table.appointmentDate),
+    promotionIndex: index("appointments_promotion_idx").on(table.promotionId),
     clientDateIndex: index("appointments_client_date_idx").on(
       table.clientId,
       table.appointmentDate,

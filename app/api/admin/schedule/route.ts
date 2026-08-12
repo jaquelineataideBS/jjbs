@@ -1,11 +1,11 @@
 import { asc, eq, gte } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { blockedTimes, businessHours, professionalServices, professionals, services } from "../../../../db/schema";
-import { isClockTime, todayInFortaleza } from "../../../../lib/scheduling";
+import { hasOverlappingRanges, isClockTime, todayInFortaleza } from "../../../../lib/scheduling";
 import { requireAdmin } from "../../../../lib/admin";
 import { normalizeWhatsapp } from "../../../../lib/masks";
 
-type HourInput = { weekday: number; startTime: string; endTime: string; breakStart: string; breakEnd: string; active: boolean };
+type HourInput = { weekday: number; startTime: string; endTime: string };
 
 function noStore(data: Record<string, unknown>, status = 200) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -29,21 +29,20 @@ function parseProfessional(value: unknown) {
 }
 
 function parseHours(value: unknown): HourInput[] | null {
-  if (!Array.isArray(value) || value.length !== 7) return null;
+  if (!Array.isArray(value) || value.length > 70) return null;
   const result: HourInput[] = [];
   for (const row of value) {
     if (!isRecord(row)) return null;
     const weekday = Number(row.weekday);
     const startTime = typeof row.startTime === "string" ? row.startTime : "";
     const endTime = typeof row.endTime === "string" ? row.endTime : "";
-    const breakStart = typeof row.breakStart === "string" ? row.breakStart : "";
-    const breakEnd = typeof row.breakEnd === "string" ? row.breakEnd : "";
-    const active = row.active === true;
     if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !isClockTime(startTime) || !isClockTime(endTime) || startTime >= endTime) return null;
-    if ((breakStart || breakEnd) && (!isClockTime(breakStart) || !isClockTime(breakEnd) || breakStart >= breakEnd || breakStart < startTime || breakEnd > endTime)) return null;
-    result.push({ weekday, startTime, endTime, breakStart, breakEnd, active });
+    result.push({ weekday, startTime, endTime });
   }
-  return new Set(result.map((item) => item.weekday)).size === 7 ? result : null;
+  for (const weekday of Array.from({ length: 7 }, (_, index) => index)) {
+    if (hasOverlappingRanges(result.filter((item) => item.weekday === weekday))) return null;
+  }
+  return result;
 }
 
 function parseBlock(value: unknown) {
@@ -96,8 +95,24 @@ export async function POST(request: Request) {
       if (!professionalId || !hours) return noStore({ message: "Revise os horários de funcionamento." }, 400);
       const [professional] = await db.select({ id: professionals.id }).from(professionals).where(eq(professionals.id, professionalId)).limit(1);
       if (!professional) return noStore({ message: "Profissional não encontrada." }, 404);
-      await Promise.all(hours.map((hour) => db.insert(businessHours).values({ id: crypto.randomUUID(), professionalId, weekday: hour.weekday, startTime: hour.startTime, endTime: hour.endTime, breakStart: hour.breakStart || null, breakEnd: hour.breakEnd || null, active: hour.active })
-        .onConflictDoUpdate({ target: [businessHours.professionalId, businessHours.weekday], set: { startTime: hour.startTime, endTime: hour.endTime, breakStart: hour.breakStart || null, breakEnd: hour.breakEnd || null, active: hour.active, updatedAt: new Date() } })));
+      const removeExisting = db.delete(businessHours).where(eq(businessHours.professionalId, professionalId));
+      if (hours.length) {
+        await db.batch([
+          removeExisting,
+          db.insert(businessHours).values(hours.map((hour) => ({
+            id: crypto.randomUUID(),
+            professionalId,
+            weekday: hour.weekday,
+            startTime: hour.startTime,
+            endTime: hour.endTime,
+            breakStart: null,
+            breakEnd: null,
+            active: true,
+          }))),
+        ]);
+      } else {
+        await removeExisting;
+      }
       return noStore({ saved: true });
     }
 

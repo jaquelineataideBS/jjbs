@@ -37,11 +37,11 @@ export async function GET(request: Request) {
       return noStore({ message: "Esta profissional não atende o serviço selecionado." }, 400);
     }
 
-    const [hours] = await db.select({ startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
+    const hours = await db.select({ startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
       .from(businessHours)
       .where(and(eq(businessHours.professionalId, professionalId), eq(businessHours.weekday, weekdayForDate(appointmentDate)), eq(businessHours.active, true)))
-      .limit(1);
-    if (!hours) return noStore({ professionals: availableProfessionals, slots: [] });
+      .orderBy(asc(businessHours.startTime));
+    if (!hours.length) return noStore({ professionals: availableProfessionals, slots: [] });
 
     const [blockRows, appointmentRows] = await Promise.all([
       db.select({ startTime: blockedTimes.startTime, endTime: blockedTimes.endTime }).from(blockedTimes)
@@ -50,7 +50,9 @@ export async function GET(request: Request) {
         .where(and(eq(appointments.professionalId, professionalId), eq(appointments.appointmentDate, appointmentDate), notInArray(appointments.status, cancelledStatuses))),
     ]);
 
-    return noStore({ professionals: availableProfessionals, slots: buildAvailableSlots(hours, service.durationMinutes, [...blockRows, ...appointmentRows]) });
+    const unavailable = [...blockRows, ...appointmentRows];
+    const slots = [...new Set(hours.flatMap((period) => buildAvailableSlots(period, service.durationMinutes, unavailable)))].sort();
+    return noStore({ professionals: availableProfessionals, slots });
   } catch {
     return noStore({ message: "A agenda ainda não está configurada neste ambiente." }, 503);
   }

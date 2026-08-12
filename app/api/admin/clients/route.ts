@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, ne, notInArray, or } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import {
   appointmentServices,
@@ -6,6 +6,7 @@ import {
   auditLogs,
   clients,
   professionals,
+  sessions,
   services,
   users,
 } from "../../../../db/schema";
@@ -166,6 +167,7 @@ export async function GET(request: Request) {
     const clientRows = await db
       .select()
       .from(clients)
+      .where(eq(clients.active, true))
       .orderBy(asc(clients.name))
       .limit(300);
     const clientIds = clientRows.map((client) => client.id);
@@ -378,5 +380,50 @@ export async function PATCH(request: Request) {
     });
   } catch {
     return noStore({ message: "Não foi possível atualizar a cliente." }, 500);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) return noStore({ message: "Acesso restrito ao painel administrativo." }, 403);
+    const body: unknown = await request.json();
+    const id = isRecord(body) && typeof body.id === "string" ? body.id.trim() : "";
+    if (!id) return noStore({ message: "Cliente inválida." }, 400);
+
+    const db = await getDb();
+    const [current] = await db.select({ id: clients.id, userId: clients.userId, name: clients.name, active: clients.active })
+      .from(clients).where(eq(clients.id, id)).limit(1);
+    if (!current?.active) return noStore({ message: "Cliente não encontrada." }, 404);
+
+    const [futureAppointment] = await db.select({ id: appointments.id }).from(appointments).where(and(
+      eq(appointments.clientId, id),
+      gte(appointments.appointmentDate, todayInFortaleza()),
+      notInArray(appointments.status, ["cancelled_by_client", "cancelled_by_salon", "rescheduled", "completed", "no_show"]),
+    )).limit(1);
+    if (futureAppointment) return noStore({ message: "Cancele ou conclua os agendamentos futuros antes de excluir esta cliente." }, 409);
+
+    const archiveClient = db.update(clients).set({ active: false, marketingConsent: false, photoConsent: false, updatedAt: new Date() }).where(eq(clients.id, id));
+    const writeAudit = db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      userId: admin.id,
+      action: "client.archived",
+      entity: "client",
+      entityId: id,
+      metadata: { name: current.name, linkedAccount: Boolean(current.userId) },
+    });
+    if (current.userId) {
+      await db.batch([
+        archiveClient,
+        db.update(users).set({ status: "inactive", updatedAt: new Date() }).where(eq(users.id, current.userId)),
+        db.delete(sessions).where(eq(sessions.userId, current.userId)),
+        writeAudit,
+      ]);
+    } else {
+      await db.batch([archiveClient, writeAudit]);
+    }
+    return noStore({ deleted: true, message: "Cliente excluída com segurança." });
+  } catch {
+    return noStore({ message: "Não foi possível excluir a cliente." }, 500);
   }
 }

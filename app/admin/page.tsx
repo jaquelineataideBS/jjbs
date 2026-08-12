@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import CategoryManagement from "./category-management";
 import ClientManagement from "./client-management";
 import CommunicationManagement from "./communication-management";
 import FinanceManagement from "./finance-management";
@@ -77,6 +78,7 @@ type Professional = {
   active: boolean;
 };
 type Hours = {
+  id?: string;
   professionalId?: string;
   weekday: number;
   startTime: string;
@@ -84,6 +86,15 @@ type Hours = {
   breakStart: string | null;
   breakEnd: string | null;
   active: boolean;
+};
+type WorkPeriod = {
+  id: string;
+  startTime: string;
+  endTime: string;
+};
+type DayHours = {
+  weekday: number;
+  periods: WorkPeriod[];
 };
 type Block = {
   id: string;
@@ -131,15 +142,28 @@ const emptyProfessional: ProfessionalForm = {
   active: true,
   serviceIds: [],
 };
-const defaultHours = (): Hours[] =>
-  Array.from({ length: 7 }, (_, weekday) => ({
-    weekday,
-    startTime: "09:00",
-    endTime: "19:00",
-    breakStart: "12:00",
-    breakEnd: "13:00",
-    active: weekday > 0,
-  }));
+const blankPeriod = (id: string): WorkPeriod => ({ id, startTime: "", endTime: "" });
+const defaultHours = (): DayHours[] =>
+  Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [blankPeriod(`${weekday}-new`)] }));
+
+function editableHours(configured: Hours[]): DayHours[] {
+  return Array.from({ length: 7 }, (_, weekday) => {
+    const periods = configured
+      .filter((hour) => hour.weekday === weekday && hour.active)
+      .sort((first, second) => first.startTime.localeCompare(second.startTime))
+      .flatMap((hour, index): WorkPeriod[] => {
+        const baseId = hour.id ?? `${weekday}-${hour.startTime}-${hour.endTime}-${index}`;
+        if (hour.breakStart && hour.breakEnd && hour.startTime < hour.breakStart && hour.breakEnd < hour.endTime) {
+          return [
+            { id: `${baseId}-before`, startTime: hour.startTime, endTime: hour.breakStart },
+            { id: `${baseId}-after`, startTime: hour.breakEnd, endTime: hour.endTime },
+          ];
+        }
+        return [{ id: baseId, startTime: hour.startTime, endTime: hour.endTime }];
+      });
+    return { weekday, periods: [...periods, blankPeriod(`${weekday}-new`)] };
+  });
+}
 const weekdays = [
   "Domingo",
   "Segunda",
@@ -192,7 +216,7 @@ export default function AdminPage() {
   const [professionalForm, setProfessionalForm] =
     useState<ProfessionalForm>(emptyProfessional);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState("");
-  const [hoursForm, setHoursForm] = useState<Hours[]>(defaultHours());
+  const [hoursForm, setHoursForm] = useState<DayHours[]>(defaultHours());
   const [blockForm, setBlockForm] = useState<BlockForm>({
     blockDate: "",
     startTime: "09:00",
@@ -258,13 +282,7 @@ export default function AdminPage() {
     const configured = schedule.hours.filter(
       (hour) => hour.professionalId === selectedProfessionalId,
     );
-    setHoursForm(
-      defaultHours().map(
-        (fallback) =>
-          configured.find((hour) => hour.weekday === fallback.weekday) ??
-          fallback,
-      ),
-    );
+    setHoursForm(editableHours(configured));
   }, [schedule, selectedProfessionalId]);
 
   const selectedProfessional =
@@ -392,6 +410,10 @@ export default function AdminPage() {
   async function saveHours(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedProfessionalId) return;
+    if (hoursForm.some((day) => day.periods.some((period) => Boolean(period.startTime) !== Boolean(period.endTime)))) {
+      note("Complete a entrada e a saída de cada horário ou remova o período incompleto.", true);
+      return;
+    }
     setSaving(true);
     try {
       await request("/api/admin/schedule", {
@@ -400,7 +422,9 @@ export default function AdminPage() {
         body: JSON.stringify({
           action: "hours",
           professionalId: selectedProfessionalId,
-          hours: hoursForm,
+          hours: hoursForm.flatMap((day) => day.periods
+            .filter((period) => period.startTime && period.endTime)
+            .map((period) => ({ weekday: day.weekday, startTime: period.startTime, endTime: period.endTime }))),
         }),
       });
       note("Horários de funcionamento atualizados.");
@@ -415,6 +439,30 @@ export default function AdminPage() {
     } finally {
       setSaving(false);
     }
+  }
+  function updateWorkPeriod(weekday: number, periodId: string, field: "startTime" | "endTime", value: string) {
+    setHoursForm((current) => current.map((day) => {
+      if (day.weekday !== weekday) return day;
+      const periods = day.periods.map((period) => period.id === periodId ? { ...period, [field]: value } : period);
+      const lastPeriod = periods.at(-1);
+      if (lastPeriod?.startTime && lastPeriod.endTime) {
+        periods.push(blankPeriod(`${weekday}-${Date.now()}`));
+      }
+      return { ...day, periods };
+    }));
+  }
+  function removeWorkPeriod(weekday: number, periodId: string) {
+    setHoursForm((current) => current.map((day) => {
+      if (day.weekday !== weekday) return day;
+      const periods = day.periods.filter((period) => period.id !== periodId);
+      const lastPeriod = periods.at(-1);
+      return {
+        ...day,
+        periods: !lastPeriod || lastPeriod.startTime || lastPeriod.endTime
+          ? [...periods, blankPeriod(`${weekday}-${Date.now()}`)]
+          : periods,
+      };
+    }));
   }
   async function saveBlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -903,103 +951,47 @@ export default function AdminPage() {
                             </h2>
                           </div>
                           <p>
-                            Intervalos e dias inativos ficam indisponíveis no
-                            site.
+                            Escreva a entrada e a saída. Ao completar um período,
+                            outro campo aparece para você acrescentar mais um horário.
                           </p>
                         </div>
                         <div className="admin-hours-list">
-                          {hoursForm.map((hour) => (
-                            <div key={hour.weekday}>
-                              <label className="admin-toggle">
-                                <input
-                                  type="checkbox"
-                                  checked={hour.active}
-                                  onChange={(event) =>
-                                    setHoursForm((current) =>
-                                      current.map((item) =>
-                                        item.weekday === hour.weekday
-                                          ? {
-                                              ...item,
-                                              active: event.target.checked,
-                                            }
-                                          : item,
-                                      ),
-                                    )
-                                  }
-                                />{" "}
-                                {weekdays[hour.weekday]}
-                              </label>
-                              <input
-                                type="time"
-                                value={hour.startTime}
-                                disabled={!hour.active}
-                                onChange={(event) =>
-                                  setHoursForm((current) =>
-                                    current.map((item) =>
-                                      item.weekday === hour.weekday
-                                        ? {
-                                            ...item,
-                                            startTime: event.target.value,
-                                          }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                              />
-                              <input
-                                type="time"
-                                value={hour.endTime}
-                                disabled={!hour.active}
-                                onChange={(event) =>
-                                  setHoursForm((current) =>
-                                    current.map((item) =>
-                                      item.weekday === hour.weekday
-                                        ? {
-                                            ...item,
-                                            endTime: event.target.value,
-                                          }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                              />
-                              <input
-                                type="time"
-                                value={hour.breakStart ?? ""}
-                                disabled={!hour.active}
-                                aria-label={`Início do intervalo ${weekdays[hour.weekday]}`}
-                                onChange={(event) =>
-                                  setHoursForm((current) =>
-                                    current.map((item) =>
-                                      item.weekday === hour.weekday
-                                        ? {
-                                            ...item,
-                                            breakStart: event.target.value,
-                                          }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                              />
-                              <input
-                                type="time"
-                                value={hour.breakEnd ?? ""}
-                                disabled={!hour.active}
-                                aria-label={`Fim do intervalo ${weekdays[hour.weekday]}`}
-                                onChange={(event) =>
-                                  setHoursForm((current) =>
-                                    current.map((item) =>
-                                      item.weekday === hour.weekday
-                                        ? {
-                                            ...item,
-                                            breakEnd: event.target.value,
-                                          }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                              />
-                            </div>
+                          {hoursForm.map((day) => (
+                            <section className="admin-hours-day" key={day.weekday}>
+                              <div className="admin-hours-day-heading">
+                                <strong>{weekdays[day.weekday]}</strong>
+                                <small>{day.periods.some((period) => period.startTime && period.endTime) ? "Dia com atendimento" : "Folga"}</small>
+                              </div>
+                              <div className="admin-hours-periods">
+                                {day.periods.map((period, index) => (
+                                  <div className="admin-hours-period" key={period.id}>
+                                    <label>
+                                      <span>Entrada</span>
+                                      <input
+                                        type="time"
+                                        value={period.startTime}
+                                        aria-label={`Entrada ${index + 1} de ${weekdays[day.weekday]}`}
+                                        onChange={(event) => updateWorkPeriod(day.weekday, period.id, "startTime", event.target.value)}
+                                      />
+                                    </label>
+                                    <span className="admin-hours-separator">até</span>
+                                    <label>
+                                      <span>Saída</span>
+                                      <input
+                                        type="time"
+                                        value={period.endTime}
+                                        aria-label={`Saída ${index + 1} de ${weekdays[day.weekday]}`}
+                                        onChange={(event) => updateWorkPeriod(day.weekday, period.id, "endTime", event.target.value)}
+                                      />
+                                    </label>
+                                    {(period.startTime || period.endTime) && day.periods.length > 1 && (
+                                      <button className="admin-hours-remove" type="button" onClick={() => removeWorkPeriod(day.weekday, period.id)} aria-label={`Remover horário ${index + 1} de ${weekdays[day.weekday]}`}>Remover</button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              <p>Preencha entrada e saída. Um novo horário aparecerá automaticamente.</p>
+                            </section>
                           ))}
                         </div>
                         <button
@@ -1135,6 +1127,8 @@ export default function AdminPage() {
             )}
             {tab === "services" && (
               <section className="admin-services-layout">
+                <div className="admin-service-stack">
+                  <CategoryManagement onChanged={() => void load()} />
                 <form className="admin-service-form" onSubmit={saveService}>
                   <div className="admin-panel-heading">
                     <div>
@@ -1284,6 +1278,7 @@ export default function AdminPage() {
                     <span>↗</span>
                   </button>
                 </form>
+                </div>
                 <section className="admin-panel">
                   <div className="admin-panel-heading">
                     <div>

@@ -3,6 +3,7 @@ import { getDb } from "../../../db";
 import { appointmentServices, appointments, blockedTimes, businessHours, clients, professionalServices, professionals, services } from "../../../db/schema";
 import { getCurrentUser } from "../../../lib/auth";
 import { normalizeWhatsapp } from "../../../lib/masks";
+import { normalizeCoupon, validateCoupon } from "../../../lib/promotions";
 import { addMinutes, isClockTime, rangesOverlap, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const blockedStatuses = ["cancelled_by_client", "cancelled_by_salon"];
@@ -13,6 +14,7 @@ type BookingPayload = {
   appointmentDate: string;
   startTime: string;
   rescheduleId?: string;
+  couponCode?: string;
   client: {
     name: string;
     phone: string;
@@ -33,6 +35,7 @@ function parsePayload(value: unknown): BookingPayload | null {
   const appointmentDate = typeof value.appointmentDate === "string" ? value.appointmentDate.trim() : "";
   const startTime = typeof value.startTime === "string" ? value.startTime.trim() : "";
   const rescheduleId = typeof value.rescheduleId === "string" ? value.rescheduleId.trim() : "";
+  const couponCode = normalizeCoupon(value.couponCode);
   const clientName = typeof value.client.name === "string" ? value.client.name.trim() : "";
   const phone = normalizeWhatsapp(value.client.phone);
   const email = typeof value.client.email === "string" ? value.client.email.trim() : "";
@@ -49,6 +52,7 @@ function parsePayload(value: unknown): BookingPayload | null {
     appointmentDate,
     startTime,
     rescheduleId: rescheduleId || undefined,
+    couponCode: couponCode || undefined,
     client: { name: clientName, phone, email: email || undefined, notes: notes || undefined },
   };
 }
@@ -96,6 +100,13 @@ export async function POST(request: Request) {
       return json({ message: "Este serviço não está disponível para agendamento." }, 400);
     }
 
+    const appliedPromotion = payload.couponCode
+      ? await validateCoupon(db, payload.couponCode, service.id, service.priceCents)
+      : null;
+    if (payload.couponCode && !appliedPromotion) {
+      return json({ message: "O cupom informado não é mais válido para este serviço." }, 409);
+    }
+
     const [professional] = await db.select({ id: professionals.id }).from(professionals)
       .innerJoin(professionalServices, eq(professionalServices.professionalId, professionals.id))
       .where(and(eq(professionals.id, payload.professionalId), eq(professionals.active, true), eq(professionalServices.serviceId, service.id)))
@@ -103,14 +114,15 @@ export async function POST(request: Request) {
     if (!professional) return json({ message: "A profissional escolhida não atende este serviço." }, 400);
 
     const endTime = addMinutes(payload.startTime, service.durationMinutes);
-    const [hours] = await db.select({ startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
+    const hours = await db.select({ startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
       .from(businessHours)
-      .where(and(eq(businessHours.professionalId, professional.id), eq(businessHours.weekday, weekdayForDate(payload.appointmentDate)), eq(businessHours.active, true)))
-      .limit(1);
-    if (!hours || payload.startTime < hours.startTime || endTime > hours.endTime) return json({ message: "O horário escolhido está fora do expediente da profissional." }, 400);
-    if (hours.breakStart && hours.breakEnd && rangesOverlap({ startTime: payload.startTime, endTime }, { startTime: hours.breakStart, endTime: hours.breakEnd })) {
-      return json({ message: "O horário escolhido coincide com o intervalo da profissional." }, 400);
-    }
+      .where(and(eq(businessHours.professionalId, professional.id), eq(businessHours.weekday, weekdayForDate(payload.appointmentDate)), eq(businessHours.active, true)));
+    const selectedRange = { startTime: payload.startTime, endTime };
+    const insideWorkingPeriod = hours.some((period) =>
+      payload.startTime >= period.startTime && endTime <= period.endTime &&
+      !(period.breakStart && period.breakEnd && rangesOverlap(selectedRange, { startTime: period.breakStart, endTime: period.breakEnd })),
+    );
+    if (!insideWorkingPeriod) return json({ message: "O horário escolhido está fora do expediente da profissional." }, 400);
 
     const blocked = await db.select({ id: blockedTimes.id }).from(blockedTimes).where(and(
       eq(blockedTimes.professionalId, professional.id), eq(blockedTimes.blockDate, payload.appointmentDate), lt(blockedTimes.startTime, endTime), gt(blockedTimes.endTime, payload.startTime),
@@ -146,7 +158,10 @@ export async function POST(request: Request) {
       startTime: payload.startTime,
       endTime,
       status: "pending_confirmation",
-      totalEstimatedCents: service.priceCents,
+      totalEstimatedCents: service.priceCents === null ? null : Math.max(0, service.priceCents - (appliedPromotion?.discountCents ?? 0)),
+      promotionId: appliedPromotion?.id,
+      couponCode: appliedPromotion?.couponCode,
+      discountCents: appliedPromotion?.discountCents ?? 0,
       notesClient: payload.client.notes,
       source: "website",
     };
@@ -185,7 +200,7 @@ export async function POST(request: Request) {
       ]);
     }
 
-    return json({ appointmentId, status: "pending_confirmation", rescheduledFromId: rescheduledAppointment?.id }, 201);
+    return json({ appointmentId, status: "pending_confirmation", promotion: appliedPromotion, rescheduledFromId: rescheduledAppointment?.id }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("D1 binding") || message.includes("DB") || message.includes("cloudflare:") || message.includes("ERR_UNSUPPORTED_ESM_URL_SCHEME")) {

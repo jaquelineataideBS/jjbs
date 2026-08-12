@@ -22,6 +22,7 @@ type PortfolioItem = {
 };
 
 type Reference = { id: string; name: string };
+type ImageField = "mainImageUrl" | "beforeImageUrl" | "afterImageUrl";
 type PortfolioForm = {
   id?: string;
   title: string;
@@ -68,6 +69,7 @@ export default function PortfolioManagement() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingField, setUploadingField] = useState<ImageField | null>(null);
   const [feedback, setFeedback] = useState("");
   const [isError, setIsError] = useState(false);
 
@@ -138,6 +140,34 @@ export default function PortfolioManagement() {
   function reset() {
     setForm(emptyPortfolio);
     setFeedback("");
+  }
+
+  async function uploadImage(file: File, field: ImageField) {
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setIsError(true);
+      setFeedback("Selecione uma imagem JPEG ou PNG.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setIsError(true);
+      setFeedback("A imagem deve ter no máximo 4 MB.");
+      return;
+    }
+    setUploadingField(field);
+    setIsError(false);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const result = await request("/api/admin/media", { method: "POST", body });
+      if (typeof result.imageUrl !== "string") throw new Error("O envio da imagem não retornou um arquivo válido.");
+      setForm((current) => ({ ...current, [field]: result.imageUrl as string }));
+      setFeedback("Imagem enviada com sucesso.");
+    } catch (cause) {
+      setIsError(true);
+      setFeedback(cause instanceof Error ? cause.message : "Não foi possível enviar a imagem.");
+    } finally {
+      setUploadingField(null);
+    }
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -303,49 +333,49 @@ export default function PortfolioManagement() {
               </select>
             </label>
           </div>
-          <label>
-            Imagem principal (URL HTTPS)
+          <label className="portfolio-file-field">
+            Imagem principal (JPEG ou PNG)
             <input
-              type="url"
-              value={form.mainImageUrl}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  mainImageUrl: event.target.value,
-                }))
-              }
-              placeholder="https://…"
-              required
+              type="file"
+              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+              required={!form.mainImageUrl}
+              disabled={uploadingField !== null}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void uploadImage(file, "mainImageUrl");
+                event.target.value = "";
+              }}
             />
+            <small>{uploadingField === "mainImageUrl" ? "Enviando imagem..." : form.mainImageUrl ? "Imagem selecionada. Escolha outra para substituir." : "Escolha uma foto de até 4 MB."}</small>
           </label>
           <div className="admin-form-grid">
-            <label>
-              Imagem antes (opcional)
+            <label className="portfolio-file-field">
+              Imagem antes — JPEG ou PNG (opcional)
               <input
-                type="url"
-                value={form.beforeImageUrl}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    beforeImageUrl: event.target.value,
-                  }))
-                }
-                placeholder="https://…"
+                type="file"
+                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                disabled={uploadingField !== null}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadImage(file, "beforeImageUrl");
+                  event.target.value = "";
+                }}
               />
+              {form.beforeImageUrl && <button className="portfolio-remove-image" type="button" onClick={() => setForm((current) => ({ ...current, beforeImageUrl: "" }))}>Remover imagem</button>}
             </label>
-            <label>
-              Imagem depois (opcional)
+            <label className="portfolio-file-field">
+              Imagem depois — JPEG ou PNG (opcional)
               <input
-                type="url"
-                value={form.afterImageUrl}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    afterImageUrl: event.target.value,
-                  }))
-                }
-                placeholder="https://…"
+                type="file"
+                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                disabled={uploadingField !== null}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadImage(file, "afterImageUrl");
+                  event.target.value = "";
+                }}
               />
+              {form.afterImageUrl && <button className="portfolio-remove-image" type="button" onClick={() => setForm((current) => ({ ...current, afterImageUrl: "" }))}>Remover imagem</button>}
             </label>
           </div>
           {form.mainImageUrl && (

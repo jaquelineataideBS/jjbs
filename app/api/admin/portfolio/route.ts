@@ -7,6 +7,7 @@ import {
   services,
 } from "../../../../db/schema";
 import { requireAdmin } from "../../../../lib/admin";
+import { validStoredImagePath } from "../../../../lib/image-files";
 
 type PortfolioInput = {
   id?: string;
@@ -40,20 +41,6 @@ function optionalText(value: unknown, maxLength: number) {
   return text && text.length <= maxLength ? text : text ? undefined : null;
 }
 
-function parseImageUrl(value: unknown, required = false) {
-  const text = optionalText(value, 2000);
-  if (text === undefined || (required && !text)) return undefined;
-  if (!text) return null;
-  try {
-    const url = new URL(text);
-    return url.protocol === "https:" && !url.username && !url.password
-      ? url.toString()
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function parsePortfolio(value: unknown): PortfolioInput | null {
   if (!isRecord(value)) return null;
   const id = typeof value.id === "string" ? value.id.trim() : undefined;
@@ -64,9 +51,9 @@ function parsePortfolio(value: unknown): PortfolioInput | null {
     typeof value.category === "string" ? value.category.trim() : "";
   const serviceId = optionalText(value.serviceId, 120);
   const professionalId = optionalText(value.professionalId, 120);
-  const mainImageUrl = parseImageUrl(value.mainImageUrl, true);
-  const beforeImageUrl = parseImageUrl(value.beforeImageUrl);
-  const afterImageUrl = parseImageUrl(value.afterImageUrl);
+  const mainImageUrl = validStoredImagePath(value.mainImageUrl, true);
+  const beforeImageUrl = validStoredImagePath(value.beforeImageUrl);
+  const afterImageUrl = validStoredImagePath(value.afterImageUrl);
   const displayOrder =
     typeof value.displayOrder === "number"
       ? value.displayOrder

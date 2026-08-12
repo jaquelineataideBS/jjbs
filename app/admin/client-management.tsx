@@ -165,6 +165,28 @@ export default function ClientManagement() {
     setHistory([]);
   }
 
+  async function removeClient(client: Client) {
+    if (!window.confirm(`Excluir a cliente “${client.name}”? O histórico será preservado.`)) return;
+    setSaving(true);
+    setIsError(false);
+    try {
+      const result = await request("/api/admin/clients", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: client.id }),
+      });
+      setFeedback(messageOf(result, "Cliente excluída com segurança."));
+      if (selected?.id === client.id) { setSelected(null); setHistory([]); }
+      if (form.id === client.id) setForm(emptyClient);
+      await load();
+    } catch (cause) {
+      setIsError(true);
+      setFeedback(cause instanceof Error ? cause.message : "Não foi possível excluir a cliente.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function openRecord(client: Client) {
     edit(client);
     try {
@@ -501,6 +523,14 @@ export default function ClientManagement() {
                         onClick={() => edit(client)}
                       >
                         Editar
+                      </button>
+                      <button
+                        className="admin-client-delete"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void removeClient(client)}
+                      >
+                        Excluir
                       </button>
                     </div>
                   </article>
