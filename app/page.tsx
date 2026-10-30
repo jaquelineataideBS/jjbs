@@ -1,413 +1,79 @@
-import ReviewsHighlight from "./reviews-highlight";
+import Link from "next/link";
 import type { CSSProperties } from "react";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../db";
-import { portfolioItems, serviceCategories, services as serviceTable } from "../db/schema";
-import { defaultPublicSettings, getPublicSettings } from "../lib/public-settings";
+import { portfolioItems, serviceCategories, services } from "../db/schema";
+import { getPublicSettings } from "../lib/public-settings";
 import { instagramHref, whatsappHref } from "../lib/public-links";
+import HomeInteractions from "./home-interactions";
+import "./home.css";
 
 export const dynamic = "force-dynamic";
 
-const fallbackServices = [
-  {
-    number: "01",
-    name: "Morena iluminada",
-    description:
-      "Dimensão, brilho e um resultado sofisticado que respeita a sua identidade.",
-    duration: "A partir de 3h",
-    price: "R$ 420",
-  },
-  {
-    number: "02",
-    name: "Corte & finalização",
-    description:
-      "Um corte pensado para o seu rosto, sua rotina e o movimento natural dos fios.",
-    duration: "Até 1h30",
-    price: "R$ 120",
-  },
-  {
-    number: "03",
-    name: "Tratamento de alta performance",
-    description:
-      "Cuidado profundo para devolver maciez, força e luminosidade aos cabelos.",
-    duration: "Até 1h30",
-    price: "R$ 160",
-  },
-];
-
-const fallbackPortfolio = [
-  {
-    image:
-      "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=900&q=85",
-    category: "Coloração",
-    title: "Luz que acompanha o movimento",
-  },
-  {
-    image:
-      "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=900&q=85",
-    category: "Corte",
-    title: "Leveza para todos os dias",
-  },
-  {
-    image:
-      "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&w=900&q=85",
-    category: "Tratamento",
-    title: "Brilho, toque e cuidado",
-  },
-];
-
-const fallbackHeadline = "Seu cabelo, sua assinatura.";
-const fallbackDescription = "Um studio para viver o cuidado com calma, técnica e um olhar que enxerga a sua beleza de verdade.";
-
-async function homepageData() {
+async function getHighlights() {
   try {
     const db = await getDb();
-    const [settings, serviceRows, portfolioRows] = await Promise.all([
-      getPublicSettings(),
-      db.select({ id: serviceTable.id, name: serviceTable.name, description: serviceTable.description, durationMinutes: serviceTable.durationMinutes, priceCents: serviceTable.priceCents, priceType: serviceTable.priceType, category: serviceCategories.name })
-        .from(serviceTable).leftJoin(serviceCategories, eq(serviceCategories.id, serviceTable.categoryId)).where(eq(serviceTable.active, true)).orderBy(asc(serviceCategories.displayOrder), asc(serviceTable.name)).limit(3),
+    const [serviceRows, workRows] = await Promise.all([
+      db.select({ id: services.id, name: services.name, description: services.description, duration: services.durationMinutes, price: services.priceCents, priceType: services.priceType })
+        .from(services).leftJoin(serviceCategories, eq(serviceCategories.id, services.categoryId)).where(eq(services.active, true)).orderBy(asc(serviceCategories.displayOrder), asc(services.name)).limit(3),
       db.select({ id: portfolioItems.id, image: portfolioItems.mainImageUrl, category: portfolioItems.category, title: portfolioItems.title })
         .from(portfolioItems).where(and(eq(portfolioItems.published, true), eq(portfolioItems.featured, true))).orderBy(asc(portfolioItems.displayOrder)).limit(3),
     ]);
-    return {
-      settings,
-      services: serviceRows.length ? serviceRows.map((service, index) => ({ number: String(index + 1).padStart(2, "0"), name: service.name, description: service.description, duration: service.durationMinutes < 60 ? `${service.durationMinutes} min` : `${Math.floor(service.durationMinutes / 60)}h${service.durationMinutes % 60 ? String(service.durationMinutes % 60).padStart(2, "0") : ""}`, price: service.priceCents === null ? "Sob consulta" : `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.priceCents / 100)}` })) : fallbackServices,
-      portfolio: portfolioRows.length ? portfolioRows : fallbackPortfolio,
-    };
+    return { serviceRows, workRows: workRows.filter(work => !/^https?:\/\/(?:images\.)?unsplash\.com\//i.test(work.image)) };
   } catch {
-    return { settings: defaultPublicSettings, services: fallbackServices, portfolio: fallbackPortfolio };
+    return { serviceRows: [], workRows: [] };
   }
 }
 
-async function Homepage() {
-  const { settings, services, portfolio } = await homepageData();
+export default async function Home() {
+  const [settings, { serviceRows, workRows }] = await Promise.all([getPublicSettings(), getHighlights()]);
+  const name = settings.salonName.replace(/Beauty Studio$/i, "").trim();
+  const portrait = settings.bannerImageUrl || "/jaqueline-justino-hero.png";
   const whatsapp = whatsappHref(settings.whatsapp);
-  const studioParts = settings.salonName.replace(/Beauty Studio$/i, "").trim();
-  const heroImage = settings.bannerImageUrl || "/jaqueline-justino-hero.png";
-  const logoImage = settings.logoUrl || "/jaqueline-justino-monogram.png?v=1";
   return (
-    <main style={{ "--black": settings.primaryColor, "--gold": settings.accentColor } as CSSProperties}>
-      <header className="site-header">
-        <a
-          className="brand"
-          href="#inicio"
-          aria-label={`${settings.salonName} - início`}
-        >
-          <span className="brand-symbol" aria-hidden="true">
-            <img src={logoImage} alt="" />
-          </span>
-          <span className="brand-name">
-            <strong>{studioParts}</strong>
-            <small>Beauty Studio</small>
-          </span>
-        </a>
-
-        <nav className="main-nav" aria-label="Navegação principal">
-          <a href="#inicio">Início</a>
-          <a href="/servicos">Serviços</a>
-          <a href="/trabalhos">Trabalhos</a>
-          <a href="#studio">O studio</a>
-          <a href="/contato">Contato</a>
-          <a href="/minha-conta">Minha conta</a>
+    <main className="studio-home" style={{ "--home-ink": settings.primaryColor, "--home-accent": settings.accentColor } as CSSProperties}>
+      <HomeInteractions />
+      <a className="home-skip" href="#conteudo">Ir para o conteúdo</a>
+      <header className="home-header">
+        <Link className="home-brand" href="/" aria-label={`${settings.salonName} — início`}>
+          <img src={settings.logoUrl || "/jaqueline-justino-monogram.png"} alt="" width="42" height="50" />
+          <span>{name}<small>Beauty Studio</small></span>
+        </Link>
+        <nav className="home-nav" aria-label="Navegação principal">
+          <a href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="#studio">O studio</a><a href="/contato">Contato</a>
         </nav>
-
-        <a className="header-cta" href="/agendar">
-          Agendar horário <span>↗</span>
-        </a>
+        <a className="home-account" href="/minha-conta">Minha conta <span aria-hidden="true">↗</span></a>
+        <details className="home-menu"><summary>Menu</summary><nav aria-label="Navegação no celular"><a href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="#studio">O studio</a><a href="/contato">Contato</a><a href="/minha-conta">Minha conta</a></nav></details>
       </header>
-
-      <section className="hero" id="inicio">
-        <div className="hero-copy">
-          <p className="eyebrow">
-            Beleza com intenção <span>✦</span>
-          </p>
-          <h1>{settings.homepageHeadline || fallbackHeadline}</h1>
-          <p className="hero-text">{settings.homepageDescription || fallbackDescription}</p>
-          <div className="hero-actions">
-            <a className="button button-gold" href="/agendar">
-              Agendar meu horário <span>↗</span>
-            </a>
-            <a className="text-link" href="/servicos">
-              Conhecer serviços <span>→</span>
-            </a>
-          </div>
-          <div className="hero-proof">
-            <div className="avatar-stack" aria-hidden="true">
-              <span>J</span>
-              <span>R</span>
-              <span>M</span>
-            </div>
-            <p>
-              <strong>+500 clientes</strong>
-              <br />
-              já viveram essa experiência
-            </p>
-          </div>
+      <section className="home-hero" id="conteudo" aria-labelledby="home-title">
+        <div className="home-hero-copy">
+          <h1 id="home-title">{settings.homepageHeadline || "Beleza com assinatura."}</h1>
+          <p>{settings.homepageDescription || `${settings.salonName}: cabelo, cuidado e um olhar só para você. Um atendimento que começa com escuta e termina com o seu estilo.`}</p>
+          <a className="home-button" href="/agendar">Agendar meu horário <span aria-hidden="true">↗</span></a>
+          <a className="home-secondary" href="/servicos">Encontre seu cuidado <span aria-hidden="true">↓</span></a>
+          <p className="home-hero-note">Do primeiro cuidado ao toque final, o seu estilo guia cada escolha.</p>
         </div>
-
-        <div className="hero-visual">
-          <div className="hero-photo-wrap">
-            <img
-              src={heroImage}
-              alt={`${studioParts}, especialista do ${settings.salonName}`}
-            />
-          </div>
-          <div className="hero-note">
-            <span className="note-star">✦</span>
-            <p>
-              {studioParts}
-              <br />
-              <em>proprietária & especialista.</em>
-            </p>
-          </div>
-          <div
-            className="hero-stamp"
-            aria-label={settings.salonName}
-          >
-            <span className="hero-stamp-symbol" aria-hidden="true">
-              <img src={logoImage} alt="" />
-            </span>
-          </div>
+        <figure className="home-portrait"><img src={portrait} alt={`${name} no Beauty Studio`} fetchPriority="high" /></figure>
+      </section>
+      <section className="home-services home-section" aria-labelledby="services-title">
+        <div className="home-section-top"><h2 id="services-title">O seu próximo cuidado.</h2><a className="home-link" href="/servicos">Todos os serviços ↗</a></div>
+        {serviceRows.length ? <div className="home-service-list">{serviceRows.map(service => <a href="/agendar" key={service.id} className="home-service"><h3>{service.name}</h3><p>{service.description}</p><div><span>{service.duration >= 60 ? `${Math.floor(service.duration / 60)}h${service.duration % 60 ? String(service.duration % 60).padStart(2, "0") : ""}` : `${service.duration} min`}</span><strong>{service.price === null ? "Sob consulta" : `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.price / 100)}`}</strong></div><span className="home-service-arrow" aria-hidden="true">↗</span></a>)}</div> : <div className="home-service-empty"><p>Uma mudança de visual ou um momento de cuidado? Conheça os serviços e escolha o atendimento para você.</p><a className="home-button" href="/servicos">Explorar serviços ↗</a></div>}
+      </section>
+      <section className="home-about home-section" id="studio" aria-labelledby="studio-title">
+        <div className="home-about-name"><img src={settings.logoUrl || "/jaqueline-justino-monogram.png"} alt="" loading="lazy" /><p>Seu estilo merece<br />um cuidado próprio.</p></div>
+        <div><h2 id="studio-title">Antes do espelho,<br />uma conversa.</h2><p>O que você quer mudar? O que quer manter? Seu atendimento começa com espaço para falar sobre o seu cabelo, seu estilo e a sua rotina.</p><p>Da escolha do serviço ao acabamento, um cuidado pensado para acompanhar você também fora do studio.</p><a className="home-link" href={whatsapp}>Converse com o studio ↗</a></div>
+      </section>
+      {workRows.length > 0 && <section className="home-work home-section" aria-labelledby="work-title"><div className="home-section-top"><h2 id="work-title">Nossa assinatura.</h2><a className="home-link" href="/trabalhos">Ver todos os trabalhos ↗</a></div><div className={`home-work-grid${workRows.length < 3 ? " home-work-pair" : ""}`}>{workRows.map(work => <a href="/trabalhos" key={work.id}><figure><img src={work.image} alt={work.title || work.category || "Trabalho realizado no studio"} loading="lazy" /><figcaption><span>{work.title || work.category || "Conheça este resultado"}</span><span aria-hidden="true">↗</span></figcaption></figure>{work.title && work.category && work.title !== work.category && <p>{work.category}</p>}</a>)}</div></section>}
+      <section className="home-booking home-section" aria-labelledby="booking-title"><div><h2 id="booking-title">Reserve um tempo<br />para você.</h2><p>Escolha seu serviço, consulte os horários e faça seu agendamento pelo app.</p></div><div><a className="home-button" href="/agendar">Escolher meu horário ↗</a><a className="home-secondary" href="/lista-de-espera">Não encontrou horário? Entre na lista de espera ↗</a></div></section>
+      <section className="home-faq home-section" aria-labelledby="faq-title">
+        <div><h2 id="faq-title">Pode chegar<br />sem dúvidas.</h2><p>O essencial para planejar a sua visita com tranquilidade.</p><a className="home-link" href={whatsapp}>Tire uma dúvida pelo WhatsApp ↗</a></div>
+        <div className="home-faq-list">
+          <details><summary>Como faço meu agendamento?<span aria-hidden="true">+</span></summary><p>Acesse o agendamento, escolha o serviço e consulte os horários disponíveis. Se não encontrar um horário para você, entre na lista de espera.</p><a href="/agendar">Consultar horários ↗</a></details>
+          <details><summary>Ainda não sei qual serviço escolher.<span aria-hidden="true">+</span></summary><p>Converse com o studio antes de reservar. Conte o que você deseja para o seu cabelo para receber orientação sobre o atendimento.</p><a href={whatsapp}>Conversar pelo WhatsApp ↗</a></details>
+          <details><summary>E se eu precisar cancelar?<span aria-hidden="true">+</span></summary><p>{settings.cancellationPolicy}</p></details>
         </div>
       </section>
-
-      <section className="quick-links" aria-label="Acessos rápidos">
-        <a href="/agendar">
-          <span>01</span>
-          <strong>Agendar horário</strong>
-          <i>↗</i>
-        </a>
-        <a href="/servicos">
-          <span>02</span>
-          <strong>Explorar serviços</strong>
-          <i>↗</i>
-        </a>
-        <a href="/trabalhos">
-          <span>03</span>
-          <strong>Ver trabalhos</strong>
-          <i>↗</i>
-        </a>
-        <a href="/promocoes">
-          <span>04</span>
-          <strong>Promoções</strong>
-          <i>↗</i>
-        </a>
-        <a href={whatsapp} target="_blank" rel="noreferrer">
-          <span>05</span>
-          <strong>Falar no WhatsApp</strong>
-          <i>↗</i>
-        </a>
-        <a href="/lista-de-espera">
-          <span>06</span>
-          <strong>Lista de espera</strong>
-          <i>↗</i>
-        </a>
-      </section>
-
-      <section className="section services-section" id="servicos">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">
-              O que fazemos <span>✦</span>
-            </p>
-            <h2>
-              Serviços para
-              <br />
-              <em>realçar o essencial.</em>
-            </h2>
-          </div>
-          <p className="section-intro">
-            Cada atendimento começa com uma conversa. Porque o melhor resultado
-            é aquele que combina com você.
-          </p>
-        </div>
-
-        <div className="services-grid">
-          {services.map((service) => (
-            <article className="service-card" key={service.number}>
-              <div className="service-top">
-                <span>{service.number}</span>
-                <span>✦</span>
-              </div>
-              <h3>{service.name}</h3>
-              <p>{service.description}</p>
-              <div className="service-meta">
-                <span>{service.duration}</span>
-                <strong>{service.price}</strong>
-              </div>
-              <a className="service-link" href="/agendar">
-                Ver detalhes <span>↗</span>
-              </a>
-            </article>
-          ))}
-        </div>
-        <a className="outline-link" href="/servicos">
-          Ver todos os serviços <span>↗</span>
-        </a>
-      </section>
-
-      <section className="experience-band" id="studio">
-        <div className="experience-photo">
-          <img
-            src="https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=1000&q=85"
-            alt="Detalhe de atendimento em studio de beleza"
-          />
-        </div>
-        <div className="experience-copy">
-          <p className="eyebrow">
-            A experiência JBS <span>✦</span>
-          </p>
-          <h2>
-            Mais do que um
-            <br />
-            <em>resultado bonito.</em>
-          </h2>
-          <p>
-            O studio nasceu para ser um respiro na rotina. Um espaço íntimo,
-            acolhedor e técnico, onde cada detalhe foi pensado para que você
-            saia se sentindo ainda mais você.
-          </p>
-          <div className="values-row">
-            <span>
-              01 <b>Escuta</b>
-            </span>
-            <span>
-              02 <b>Técnica</b>
-            </span>
-            <span>
-              03 <b>Cuidado</b>
-            </span>
-          </div>
-          <a className="text-link" href="#contato">
-            Conhecer o studio <span>→</span>
-          </a>
-        </div>
-      </section>
-
-      <section className="section portfolio-section" id="trabalhos">
-        <div className="section-heading portfolio-heading">
-          <div>
-            <p className="eyebrow">
-              Feito por nós <span>✦</span>
-            </p>
-            <h2>
-              Trabalhos que
-              <br />
-              <em>falam por si.</em>
-            </h2>
-          </div>
-          <a className="outline-link" href="/trabalhos">
-            Ver galeria completa <span>↗</span>
-          </a>
-        </div>
-        <div className="portfolio-grid">
-          {portfolio.map((item, index) => (
-            <a
-              className={`portfolio-item portfolio-item-${index + 1}`}
-              href="/agendar"
-              key={item.title}
-            >
-              <img src={item.image} alt={item.title} />
-              <div className="portfolio-overlay">
-                <span>{item.category}</span>
-                <strong>{item.title}</strong>
-                <i>↗</i>
-              </div>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <section className="quote-section">
-        <div className="reviews-live">
-          <ReviewsHighlight />
-        </div>
-        <span className="quote-mark">“</span>
-        <blockquote>
-          Saí me sentindo linda, leve e muito mais segura de mim. O cuidado em
-          cada detalhe faz toda a diferença.
-        </blockquote>
-        <p>
-          Mariana, cliente JBS <span>✦✦✦✦✦</span>
-        </p>
-      </section>
-
-      <section className="booking-cta" id="agendar">
-        <div>
-          <p className="eyebrow">
-            Seu próximo momento <span>✦</span>
-          </p>
-          <h2>Começa aqui.</h2>
-        </div>
-        <div className="booking-actions">
-          <p>
-            Escolha seu serviço e encontre um horário que combine com a sua
-            rotina.
-          </p>
-          <a className="button button-gold" href="/agendar">
-            Começar agendamento <span>↗</span>
-          </a>
-        </div>
-      </section>
-
-      <footer className="site-footer" id="contato">
-        <div className="footer-top">
-          <div>
-            <a className="brand footer-brand" href="#inicio">
-              <span className="brand-symbol" aria-hidden="true">
-                <img src={logoImage} alt="" />
-              </span>
-              <span className="brand-name">
-                <strong>{studioParts}</strong>
-                <small>Beauty Studio</small>
-              </span>
-            </a>
-            <p>
-              Beleza, cuidado e transformação
-              <br />
-              em cada detalhe.
-            </p>
-          </div>
-          <div className="footer-column">
-            <span>Visite o studio</span>
-            <p>{settings.address || "Endereço disponível por WhatsApp"}</p>
-          </div>
-          <div className="footer-column">
-            <span>Fale com a gente</span>
-            <p>
-              {settings.whatsapp || "WhatsApp do studio"}
-              <br />
-              <a href="mailto:oi@jaquelinebeauty.com">oi@jaquelinebeauty.com</a>
-            </p>
-          </div>
-          <div className="footer-column">
-            <span>Redes</span>
-            <p>
-              <a href={instagramHref(settings.instagram)} target="_blank" rel="noreferrer">Instagram ↗</a>
-              <br />
-              <a href={whatsapp}>WhatsApp ↗</a>
-            </p>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <span>© 2026 {settings.salonName}</span>
-          <span>Seg–Sáb · 09h às 19h</span>
-          <a href="#inicio">Voltar ao topo ↑</a>
-        </div>
-      </footer>
-      <a
-        className="floating-whatsapp"
-        href={whatsapp}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`Falar com ${settings.salonName} pelo WhatsApp`}
-      >
-        ◔
-      </a>
+      <footer className="home-footer"><div className="home-footer-top"><div><a className="home-footer-name" href="#conteudo">{name}<small>Beauty Studio</small></a><p>{settings.address || "Consulte a localização com o studio."}</p></div><nav aria-label="Links do studio"><a href="/promocoes">Promoções</a><a href="/trabalhos">Trabalhos</a><a href="/minha-conta">Minha conta</a></nav><nav aria-label="Contato e redes"><a href={whatsapp}>WhatsApp ↗</a>{settings.instagram && <a href={instagramHref(settings.instagram)} target="_blank" rel="noreferrer">Instagram ↗</a>}<a href="/contato">Fale com o studio ↗</a></nav></div><div className="home-footer-bottom"><span>© {new Date().getFullYear()} {settings.salonName}</span><a href="/privacidade">Privacidade</a><a href="#conteudo">Voltar ao início ↑</a></div></footer>
     </main>
   );
-}
-
-export default function Home() {
-  return <Homepage />;
 }
