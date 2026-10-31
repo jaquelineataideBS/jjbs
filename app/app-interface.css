@@ -52,6 +52,12 @@
 .admin-page :is(.admin-service-form,.category-form,.reviews-admin-grid aside):focus-within{border-color:var(--gold)}
 .admin-page .admin-portfolio-preview{border-radius:12px;padding:12px}
 .admin-page .admin-portfolio-preview img{height:auto;max-height:300px;border-radius:8px}
+.admin-page .admin-portfolio-previews{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.admin-page .admin-portfolio-previews .admin-portfolio-preview{min-width:0;margin:0}
+.works-page .work-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.works-page .work-comparison figure{margin:0;min-width:0;position:relative;overflow:hidden;aspect-ratio:4/3;background:#211e1a}
+.works-page .work-comparison img{display:block;width:100%;height:100%;object-fit:cover;filter:saturate(.82)}
+.works-page .work-comparison figcaption{position:absolute;left:8px;bottom:8px;padding:5px 8px;background:rgba(20,18,15,.82);color:#f3ead9;font-size:11px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px}
 .admin-page .admin-portfolio-list>article>img{height:auto;border-radius:10px}
 .admin-page .portfolio-file-field input[type="file"]{width:100%;padding:12px;font-size:14px;min-height:62px}
 .admin-page input[type="file"]::file-selector-button{border:0;border-radius:9px;background:var(--gold);color:#17130d;padding:11px 14px;font:inherit;margin-right:12px}

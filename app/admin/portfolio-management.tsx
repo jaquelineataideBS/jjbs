@@ -371,16 +371,26 @@ export default function PortfolioManagement() {
               {form.afterImageUrl && <button className="portfolio-remove-image" type="button" disabled={saving || uploadingField !== null} onClick={() => setForm((current) => ({ ...current, afterImageUrl: "" }))}>Remover imagem</button>}
             </label>
           </div>
-          {form.mainImageUrl && (
-            <div className="admin-portfolio-preview">
-              <img
-                src={form.mainImageUrl}
-                alt="Prévia do trabalho"
-                onError={(event) => {
-                  event.currentTarget.style.display = "none";
-                }}
-              />
-              <span>Prévia da imagem principal</span>
+          {(form.mainImageUrl || form.beforeImageUrl || form.afterImageUrl) && (
+            <div className="admin-portfolio-previews" aria-label="Prévia das fotos do trabalho">
+              {form.mainImageUrl && (
+                <div className="admin-portfolio-preview">
+                  <img src={form.mainImageUrl} alt="Prévia da imagem principal" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                  <span>Imagem principal</span>
+                </div>
+              )}
+              {form.beforeImageUrl && (
+                <div className="admin-portfolio-preview">
+                  <img src={form.beforeImageUrl} alt="Prévia da foto de antes" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                  <span>Antes</span>
+                </div>
+              )}
+              {form.afterImageUrl && (
+                <div className="admin-portfolio-preview">
+                  <img src={form.afterImageUrl} alt="Prévia da foto de depois" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                  <span>Depois</span>
+                </div>
+              )}
             </div>
           )}
           <label className="admin-toggle">

@@ -160,13 +160,29 @@ export default function WorksPage() {
                     {String(index + 1).padStart(2, "0")}
                   </span>
                 </div>
+                {(item.beforeImageUrl || item.afterImageUrl) && (
+                  <div className="work-comparison" aria-label={`Fotos do resultado: ${item.title}`}>
+                    {item.beforeImageUrl && (
+                      <figure>
+                        <img src={item.beforeImageUrl} alt={`${item.title} — antes`} loading="lazy" />
+                        <figcaption>Antes</figcaption>
+                      </figure>
+                    )}
+                    {item.afterImageUrl && (
+                      <figure>
+                        <img src={item.afterImageUrl} alt={`${item.title} — depois`} loading="lazy" />
+                        <figcaption>Depois</figcaption>
+                      </figure>
+                    )}
+                  </div>
+                )}
                 <div className="work-info">
                   <p>{item.category}</p>
                   <h2>{item.title}</h2>
                   <span>{item.description}</span>
                   {item.beforeImageUrl && item.afterImageUrl && (
                     <small className="work-before-after">
-                      Antes e depois disponível
+                      Compare o resultado
                     </small>
                   )}
                   <a href="/agendar">
