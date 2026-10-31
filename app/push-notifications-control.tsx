@@ -50,8 +50,7 @@ export default function PushNotificationsControl({ audience }: Props) {
         setReady("ready" in result && result.ready === true);
         setMarketingConsent("marketingConsent" in result && result.marketingConsent === true);
         setLoading(false);
-        if ("Notification" in window && Notification.permission === "granted" &&
-          (audience === "studio" || ("marketingConsent" in result && result.marketingConsent === true))) {
+        if ("Notification" in window && Notification.permission === "granted") {
           void activate(false).catch(() => undefined);
           void import("../lib/firebase-web").then(({ listenForForegroundPush }) =>
             listenForForegroundPush((notice) => {
@@ -147,8 +146,8 @@ export default function PushNotificationsControl({ audience }: Props) {
   return (
     <section className={`push-notifications-control ${audience === "studio" ? "push-notifications-studio" : "push-notifications-client"}`} aria-label="Preferências de notificações push">
       <div className="push-notifications-copy">
-        <strong>{audience === "studio" ? "Avisos do studio neste dispositivo" : "Cupons e promoções por notificação"}</strong>
-        <p>{audience === "studio" ? "Receba alertas de novos agendamentos." : "Ative para receber campanhas do studio mesmo quando o app estiver fechado."}</p>
+        <strong>{audience === "studio" ? "Avisos do studio neste dispositivo" : "Notificações da sua conta"}</strong>
+        <p>{audience === "studio" ? "Receba alertas de novos agendamentos." : "Receba avisos dos seus agendamentos. Cupons e promoções só chegam se você aceitar abaixo."}</p>
       </div>
       {audience === "client" && (
         <label className="push-marketing-consent">
@@ -172,7 +171,7 @@ export default function PushNotificationsControl({ audience }: Props) {
       ) : permission === "denied" ? (
         <small className="push-setup-note">Permissão bloqueada. Altere-a nas configurações do navegador.</small>
       ) : (
-        <button className="text-button" type="button" onClick={() => void activate(true).catch((reason: unknown) => { setFeedback(reason instanceof Error ? reason.message : "Não foi possível ativar."); setIsError(true); })} disabled={loading || working || (audience === "client" && !marketingConsent)}>
+        <button className="text-button" type="button" onClick={() => void activate(true).catch((reason: unknown) => { setFeedback(reason instanceof Error ? reason.message : "Não foi possível ativar."); setIsError(true); })} disabled={loading || working}>
           {working ? "Ativando…" : "Ativar notificações neste dispositivo"}
         </button>
       )}

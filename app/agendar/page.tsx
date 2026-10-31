@@ -392,7 +392,9 @@ export default function BookingPage() {
             <strong>{selectedService.name}</strong> com{" "}
             <strong>{selectedProfessional.name}</strong>, em{" "}
             <strong>{selectedDate}</strong>, às <strong>{time}</strong>. A
-            confirmação definitiva será feita pelo studio.
+            confirmação definitiva será feita pelo studio. Se você estiver na
+            sua conta e com notificações ativadas, também avisaremos por lá
+            quando o horário for confirmado.
           </p>
           <div className="booking-success-card">
             <span>Próximo passo</span>

@@ -242,11 +242,20 @@ export async function POST(request: Request) {
       ]);
     }
 
-    await sendAppointmentPush(studioUsers.map((studioUser) => studioUser.id), {
-      title: rescheduledAppointment ? "Novo pedido de reagendamento" : "Novo agendamento",
-      body: `Novo pedido para ${payload.appointmentDate.split("-").reverse().join("/")}, às ${payload.startTime}.`,
-      url: "/admin",
-    });
+    await Promise.all([
+      sendAppointmentPush(studioUsers.map((studioUser) => studioUser.id), {
+        title: rescheduledAppointment ? "Novo pedido de reagendamento" : "Novo agendamento",
+        body: `Novo pedido para ${payload.appointmentDate.split("-").reverse().join("/")}, às ${payload.startTime}.`,
+        url: "/admin",
+      }),
+      ...(currentUser?.role === "client"
+        ? [sendAppointmentPush([currentUser.id], {
+            title: rescheduledAppointment ? "Pedido de reagendamento recebido" : "Pedido de agendamento recebido",
+            body: `Seu pedido para ${service.name} em ${payload.appointmentDate.split("-").reverse().join("/")}, às ${payload.startTime}, foi recebido.`,
+            url: "/minha-conta#notificacoes",
+          })]
+        : []),
+    ]);
 
     return json({ appointmentId, status: "pending_confirmation", promotion: appliedPromotion, rescheduledFromId: rescheduledAppointment?.id }, 201);
   } catch (error) {

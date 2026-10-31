@@ -54,10 +54,6 @@ export async function POST(request: Request) {
     if (fid.length < 8 || fid.length > 256) return noStore({ message: "O identificador do dispositivo é inválido." }, 400);
     if (user.role !== "client" && !internalRoles.includes(user.role as (typeof internalRoles)[number])) return noStore({ message: "Acesso restrito." }, 403);
     const db = await getDb();
-    if (user.role === "client") {
-      const [client] = await db.select({ marketingConsent: clients.marketingConsent }).from(clients).where(eq(clients.userId, user.id)).limit(1);
-      if (!client?.marketingConsent) return noStore({ message: "Ative primeiro o consentimento para receber cupons e promoções." }, 409);
-    }
     await db.insert(pushInstallations).values({ id: crypto.randomUUID(), userId: user.id, fid })
       .onConflictDoUpdate({ target: pushInstallations.fid, set: { userId: user.id, updatedAt: new Date() } });
     return noStore({ message: "Notificações ativadas neste dispositivo." }, 201);
