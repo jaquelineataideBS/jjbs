@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- dados protegidos são carregados após autenticação. */
 
+import { revealEditor } from "../../lib/editor-navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Promotion = { id: string; title: string; description: string; discountType: string; discountValue: number; couponCode: string | null; audience: string; comboDescription: string | null; startDate: string; endDate: string; active: boolean; featured: boolean; serviceIds: string[] };
@@ -46,8 +47,8 @@ export default function MarketingManagement() {
   }, [data, query]);
 
   function edit(promotion: Promotion) {
+    revealEditor(".marketing-form");
     setForm({ ...promotion, discountInput: promotion.discountType === "fixed" ? (promotion.discountValue / 100).toFixed(2).replace(".", ",") : String(promotion.discountValue) });
-    window.scrollTo({ top: 440, behavior: "smooth" });
   }
   function toggleService(id: string) {
     setForm((current) => ({ ...current, serviceIds: current.serviceIds.includes(id) ? current.serviceIds.filter((item) => item !== id) : [...current.serviceIds, id] }));

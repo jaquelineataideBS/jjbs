@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect -- carregamentos autenticados atualizam o estado após respostas assíncronas. */
 
 import Link from "next/link";
+import { revealEditor } from "../../lib/editor-navigation";
 import { FormEvent, useEffect, useState } from "react";
 import CategoryManagement from "./category-management";
 import ClientManagement from "./client-management";
@@ -309,6 +310,10 @@ export default function AdminPage() {
     void load();
   }, []);
   useEffect(() => {
+    setMessage("");
+    setError(false);
+  }, [tab]);
+  useEffect(() => {
     if (tab === "schedule" && data) void loadSchedule();
   }, [tab, data]);
   useEffect(() => {
@@ -352,6 +357,7 @@ export default function AdminPage() {
     }
   }
   function editService(service: Service) {
+    revealEditor(".admin-service-editor");
     setServiceForm({
       id: service.id,
       categoryId: service.categoryId ?? "",
@@ -402,6 +408,7 @@ export default function AdminPage() {
     }
   }
   function editProfessional(professional: Professional) {
+    revealEditor("form[data-professional-editor]");
     setSelectedProfessionalId(professional.id);
     setProfessionalForm({
       id: professional.id,
@@ -622,9 +629,7 @@ export default function AdminPage() {
             <p className="eyebrow">
               Gestão do studio <span>✦</span>
             </p>
-            <h1>
-              Agenda e <em>operação.</em>
-            </h1>
+            <h1>{({ agenda: "Agenda do studio", schedule: "Configurar agenda", services: "Serviços", clients: "Clientes", portfolio: "Galeria de trabalhos", finance: "Financeiro", marketing: "Promoções e fidelidade", communication: "Comunicação", reviews: "Avaliações", settings: "Configurações", users: "Usuários internos" })[tab]}</h1>
             <p>
               Organize atendimentos, profissionais, horários e clientes com
               segurança.
@@ -662,7 +667,7 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
-            <section className="admin-stats" aria-label="Resumo do studio">
+            {tab === "agenda" && <section className="admin-stats" aria-label="Resumo do studio">
               <article>
                 <span>Agenda de hoje</span>
                 <strong>{data.stats.todayCount}</strong>
@@ -685,7 +690,22 @@ export default function AdminPage() {
                   <small>sem descontos aplicados</small>
                 </article>
               )}
-            </section>
+            </section>}
+            <label className="mobile-module-select">Área do painel
+              <select value={tab} onChange={event => setTab(event.target.value as typeof tab)}>
+                <option value="agenda">Agenda</option>
+                {can("schedule") && <option value="schedule">Configurar agenda</option>}
+                {can("services") && <option value="services">Serviços</option>}
+                {can("clients") && <option value="clients">Clientes</option>}
+                {can("portfolio") && <option value="portfolio">Galeria de trabalhos</option>}
+                {can("finance") && <option value="finance">Financeiro</option>}
+                {can("marketing") && <option value="marketing">Promoções e fidelidade</option>}
+                {can("communication") && <option value="communication">Comunicação</option>}
+                {can("reviews") && <option value="reviews">Avaliações</option>}
+                {can("settings") && <option value="settings">Configurações</option>}
+                {can("users") && <option value="users">Usuários internos</option>}
+              </select>
+            </label>
             <div
               className="admin-tabs"
               role="tablist"
@@ -865,7 +885,7 @@ export default function AdminPage() {
               <section className="admin-schedule-layout">
                 <form
                   className="admin-service-form"
-                  onSubmit={saveProfessional}
+                  data-professional-editor="true" onSubmit={saveProfessional}
                 >
                   <div className="admin-panel-heading">
                     <div>
@@ -1255,7 +1275,7 @@ export default function AdminPage() {
               <section className="admin-services-layout">
                 <div className="admin-service-stack">
                   <CategoryManagement onChanged={() => void load()} />
-                  <form className="admin-service-form" onSubmit={saveService}>
+                  <form className="admin-service-form admin-service-editor" onSubmit={saveService}>
                     <div className="admin-panel-heading">
                       <div>
                         <span>

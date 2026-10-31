@@ -1,53 +1,36 @@
-const CACHE_NAME = "jbs-app-v2";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon-192.png", "/pwa-icon-512.png"];
+const CACHE_NAME = "jbs-app-v4";
+const APP_SHELL = ["/offline.html", "/pwa-icon-192.png", "/pwa-icon-512.png"];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+self.addEventListener("install", event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    Promise.all([
-      caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))),
-      self.clients.claim(),
-    ]),
-  );
+self.addEventListener("activate", event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("jbs-app-") && key !== CACHE_NAME).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
-
-self.addEventListener("message", (event) => {
-  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
 });
-
-async function networkFirst(request, fallbackUrl, cacheResponse = true) {
-  try {
-    const response = await fetch(request, { cache: "no-store" });
-    if (cacheResponse && response.ok) {
-      const copy = response.clone();
-      void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-    }
-    return response;
-  } catch {
-    return await caches.match(request) ?? (fallbackUrl ? await caches.match(fallbackUrl) : undefined) ?? Response.error();
-  }
+async function networkFirst(request) {
+  try { return await fetch(request, { cache: "no-store" }); }
+  catch { return await caches.match("/offline.html") ?? Response.error(); }
 }
-
-self.addEventListener("fetch", (event) => {
-  const requestUrl = new URL(event.request.url);
-  if (event.request.method !== "GET" || requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith("/api/")) return;
-
-  if (event.request.mode === "navigate") {
-    const fallbackUrl = requestUrl.pathname.startsWith("/admin") ? undefined : "/";
-    event.respondWith(networkFirst(event.request, fallbackUrl, false));
+self.addEventListener("fetch", event => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (request.mode === "navigate") {
+    event.respondWith(networkFirst(request));
     return;
   }
-
-  if (["image", "font"].includes(event.request.destination)) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached ?? networkFirst(event.request)),
-    );
-    return;
+  // Only content-addressed Next assets are safe to reuse across deployments.
+  if (url.pathname.startsWith("/_next/static/") && /\/[\w.-]*[0-9a-f]{8,}[\w.-]*\.(?:js|css|woff2?)$/i.test(url.pathname)) {
+    event.respondWith(caches.open(CACHE_NAME).then(async cache => {
+      const cached = await cache.match(request);
+      if (cached) return cached;
+      const response = await fetch(request);
+      if (response.ok) await cache.put(request, response.clone());
+      return response;
+    }));
   }
-
-  event.respondWith(networkFirst(event.request));
+  // RSC payloads, mutable photos and all other requests use the network normally.
 });

@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- o painel financeiro carrega dados protegidos após a autenticação. */
 
+import { revealEditor } from "../../lib/editor-navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Method = { id: string; name: string; active: boolean; displayOrder: number };
@@ -158,6 +159,7 @@ export default function FinanceManagement() {
   }
 
   function edit(transaction: Transaction) {
+    revealEditor(".finance-form");
     setForm({
       id: transaction.id,
       appointmentId: transaction.appointmentId,
@@ -171,7 +173,6 @@ export default function FinanceManagement() {
       transactionReference: transaction.transactionReference ?? "",
       notes: transaction.notes ?? "",
     });
-    window.scrollTo({ top: 460, behavior: "smooth" });
   }
 
   async function submit(event: FormEvent) {

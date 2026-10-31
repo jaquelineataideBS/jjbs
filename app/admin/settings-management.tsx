@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- configurações protegidas são carregadas após autenticação. */
 
+import { imageUploadAccept, prepareImage } from "../../lib/prepare-image";
 import { FormEvent, useEffect, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
 
@@ -101,13 +102,13 @@ export default function SettingsManagement() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    try {
     const response = await fetch("/api/admin/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    const payload = await response.json();
-    setSaving(false);
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       setError(payload.message);
       return;
@@ -118,6 +119,12 @@ export default function SettingsManagement() {
       ...payload.settings,
       whatsapp: formatWhatsapp(payload.settings?.whatsapp ?? ""),
     });
+    window.dispatchEvent(new Event("studio-settings-updated"));
+    } catch {
+      setError("Não foi possível salvar. Verifique a conexão e tente novamente; suas alterações foram mantidas.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function updateEntry(id: string, status: string) {
@@ -137,18 +144,15 @@ export default function SettingsManagement() {
 
   async function uploadImage(field: "logoUrl" | "bannerImageUrl", file: File | undefined) {
     if (!file) return;
-    if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 4 * 1024 * 1024) {
-      setError("Escolha uma imagem JPEG ou PNG de até 4 MB.");
-      return;
-    }
     setUploadingImage(field);
     setError("");
     const data = new FormData();
-    data.append("file", file);
+
     try {
+      data.append("file", await prepareImage(file));
       const response = await fetch("/api/admin/media", { method: "POST", body: data });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || "Não foi possível enviar a foto. Tente novamente.");
       setForm((current) => ({ ...current, [field]: payload.imageUrl }));
       setFeedback("Imagem carregada. Clique em salvar configurações para publicar em todas as páginas.");
     } catch (uploadError) {
@@ -219,8 +223,8 @@ export default function SettingsManagement() {
             />
           </label>
           <label>
-            Logo do studio (JPEG ou PNG)
-            <input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={uploadingImage !== null} onChange={(event) => void uploadImage("logoUrl", event.target.files?.[0])} />
+            Logo do studio (foto de até 25 MB)
+            <input type="file" accept={imageUploadAccept} disabled={saving || uploadingImage !== null} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void uploadImage("logoUrl", file); }} />
             {form.logoUrl && <img className="settings-logo-preview" src={form.logoUrl} alt="Prévia da logo" />}
           </label>
           <div className="finance-form-title">
@@ -236,8 +240,8 @@ export default function SettingsManagement() {
             <textarea value={form.homepageDescription ?? ""} onChange={(event) => setForm({ ...form, homepageDescription: event.target.value })} />
           </label>
           <label>
-            Foto de capa (JPEG ou PNG)
-            <input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" disabled={uploadingImage !== null} onChange={(event) => void uploadImage("bannerImageUrl", event.target.files?.[0])} />
+            Foto de capa (foto de até 25 MB)
+            <input type="file" accept={imageUploadAccept} disabled={saving || uploadingImage !== null} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void uploadImage("bannerImageUrl", file); }} />
             {form.bannerImageUrl && <img className="settings-banner-preview" src={form.bannerImageUrl} alt="Prévia da capa" />}
           </label>
           <div className="admin-form-grid">
@@ -330,7 +334,7 @@ export default function SettingsManagement() {
             />
             Permitir reagendamento
           </label>
-          <button className="button button-gold" disabled={saving}>
+          <button className="button button-gold" disabled={saving || uploadingImage !== null}>
             <span>{saving ? "Salvando..." : "Salvar configurações"}</span>
             <b>→</b>
           </button>

@@ -2,6 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element, react-hooks/set-state-in-effect -- imagens remotas são configuradas pela administradora. */
 
+import { imageUploadAccept, prepareImage } from "../../lib/prepare-image";
+import { revealEditor } from "../../lib/editor-navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 type PortfolioItem = {
@@ -78,7 +80,7 @@ export default function PortfolioManagement() {
     const result: unknown = await response.json().catch(() => ({}));
     if (!response.ok)
       throw new Error(
-        messageOf(result, "Não foi possível concluir a operação."),
+        messageOf(result, response.status === 413 ? "A foto excedeu o limite de envio. Tente uma imagem menor." : "Não foi possível concluir a operação."),
       );
     return result as Record<string, unknown>;
   }
@@ -120,6 +122,7 @@ export default function PortfolioManagement() {
   }, []);
 
   function edit(item: PortfolioItem) {
+    revealEditor(".admin-portfolio-form");
     setForm({
       id: item.id,
       title: item.title,
@@ -143,21 +146,11 @@ export default function PortfolioManagement() {
   }
 
   async function uploadImage(file: File, field: ImageField) {
-    if (!["image/jpeg", "image/png"].includes(file.type)) {
-      setIsError(true);
-      setFeedback("Selecione uma imagem JPEG ou PNG.");
-      return;
-    }
-    if (file.size > 4 * 1024 * 1024) {
-      setIsError(true);
-      setFeedback("A imagem deve ter no máximo 4 MB.");
-      return;
-    }
     setUploadingField(field);
     setIsError(false);
     try {
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", await prepareImage(file));
       const result = await request("/api/admin/media", { method: "POST", body });
       if (typeof result.imageUrl !== "string") throw new Error("O envio da imagem não retornou um arquivo válido.");
       setForm((current) => ({ ...current, [field]: result.imageUrl as string }));
@@ -188,7 +181,7 @@ export default function PortfolioManagement() {
       });
       setFeedback(messageOf(result, "Trabalho salvo com sucesso."));
       setIsError(false);
-      reset();
+      setForm(emptyPortfolio);
       await load();
     } catch (cause) {
       setIsError(true);
@@ -225,7 +218,7 @@ export default function PortfolioManagement() {
               </h2>
             </div>
             {form.id && (
-              <button className="text-button" type="button" onClick={reset}>
+              <button className="text-button" type="button" disabled={saving || uploadingField !== null} onClick={reset}>
                 Novo cadastro
               </button>
             )}
@@ -334,48 +327,48 @@ export default function PortfolioManagement() {
             </label>
           </div>
           <label className="portfolio-file-field">
-            Imagem principal (JPEG ou PNG)
+            Imagem principal (foto do celular)
             <input
               type="file"
-              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+              accept={imageUploadAccept}
               required={!form.mainImageUrl}
-              disabled={uploadingField !== null}
+              disabled={saving || uploadingField !== null}
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) void uploadImage(file, "mainImageUrl");
                 event.target.value = "";
               }}
             />
-            <small>{uploadingField === "mainImageUrl" ? "Enviando imagem..." : form.mainImageUrl ? "Imagem selecionada. Escolha outra para substituir." : "Escolha uma foto de até 4 MB."}</small>
+            <small>{uploadingField === "mainImageUrl" ? "Enviando imagem..." : form.mainImageUrl ? "Imagem selecionada. Escolha outra para substituir." : "Fotos de até 25 MB. Ajustamos o tamanho antes do envio."}</small>
           </label>
           <div className="admin-form-grid">
             <label className="portfolio-file-field">
-              Imagem antes — JPEG ou PNG (opcional)
+              Imagem antes — foto do celular (opcional)
               <input
                 type="file"
-                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-                disabled={uploadingField !== null}
+                accept={imageUploadAccept}
+                disabled={saving || uploadingField !== null}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void uploadImage(file, "beforeImageUrl");
                   event.target.value = "";
                 }}
               />
-              {form.beforeImageUrl && <button className="portfolio-remove-image" type="button" onClick={() => setForm((current) => ({ ...current, beforeImageUrl: "" }))}>Remover imagem</button>}
+              {form.beforeImageUrl && <button className="portfolio-remove-image" type="button" disabled={saving || uploadingField !== null} onClick={() => setForm((current) => ({ ...current, beforeImageUrl: "" }))}>Remover imagem</button>}
             </label>
             <label className="portfolio-file-field">
-              Imagem depois — JPEG ou PNG (opcional)
+              Imagem depois — foto do celular (opcional)
               <input
                 type="file"
-                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-                disabled={uploadingField !== null}
+                accept={imageUploadAccept}
+                disabled={saving || uploadingField !== null}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void uploadImage(file, "afterImageUrl");
                   event.target.value = "";
                 }}
               />
-              {form.afterImageUrl && <button className="portfolio-remove-image" type="button" onClick={() => setForm((current) => ({ ...current, afterImageUrl: "" }))}>Remover imagem</button>}
+              {form.afterImageUrl && <button className="portfolio-remove-image" type="button" disabled={saving || uploadingField !== null} onClick={() => setForm((current) => ({ ...current, afterImageUrl: "" }))}>Remover imagem</button>}
             </label>
           </div>
           {form.mainImageUrl && (
@@ -419,7 +412,7 @@ export default function PortfolioManagement() {
           <button
             className="button button-gold"
             type="submit"
-            disabled={saving}
+            disabled={saving || uploadingField !== null}
           >
             {saving
               ? "Salvando…"
@@ -498,7 +491,7 @@ export default function PortfolioManagement() {
                   <button
                     className="text-button"
                     type="button"
-                    onClick={() => edit(item)}
+                    disabled={saving || uploadingField !== null} onClick={() => edit(item)}
                   >
                     Editar
                   </button>

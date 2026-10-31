@@ -1,177 +1,41 @@
 import type { Metadata } from "next";
+import { asc, eq } from "drizzle-orm";
+import { getDb } from "../../db";
+import { serviceCategories, services } from "../../db/schema";
 import { getPublicSettings } from "../../lib/public-settings";
 import { PublicBrand, PublicStudioName, PublicWhatsappLink } from "../public-settings";
 
-/* eslint-disable @next/next/no-html-link-for-pages -- o preview usa links nativos nas páginas públicas. */
-
-export async function generateMetadata(): Promise<Metadata> { const settings = await getPublicSettings(); return { title: `Serviços | ${settings.salonName}`, description: `Conheça os serviços de cabelo, coloração, tratamentos e penteados de ${settings.salonName}.` }; }
-
-const categories = [
-  {
-    id: "cabelos",
-    label: "01 / Cabelos & cortes",
-    title: "Cortes que acompanham a sua vida.",
-    description:
-      "Formas pensadas para o seu rosto, sua textura e o jeito como você gosta de se ver no espelho.",
-    image:
-      "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1000&q=85",
-    services: [
-      ["Corte feminino", "R$ 120", "1h"],
-      ["Corte + finalização", "R$ 150", "1h30"],
-      ["Corte masculino", "R$ 75", "45 min"],
-      ["Escova modelada", "R$ 85", "1h"],
-    ],
-  },
-  {
-    id: "coloracao",
-    label: "02 / Coloração & mechas",
-    title: "Cor com profundidade.",
-    description:
-      "Técnica, luminosidade e uma leitura cuidadosa dos seus fios para criar uma cor que parece sua.",
-    image:
-      "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1000&q=85",
-    services: [
-      ["Morena iluminada", "A partir de R$ 420", "3h"],
-      ["Mechas / luzes", "A partir de R$ 480", "4h"],
-      ["Retoque de raiz", "A partir de R$ 180", "2h"],
-      ["Tonalização", "A partir de R$ 140", "1h30"],
-    ],
-  },
-  {
-    id: "tratamentos",
-    label: "03 / Tratamentos",
-    title: "Cuidado que se sente.",
-    description:
-      "Protocolos escolhidos para devolver movimento, maciez e força ao cabelo de dentro para fora.",
-    image:
-      "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&w=1000&q=85",
-    services: [
-      ["Hidratação profunda", "R$ 160", "1h30"],
-      ["Reconstrução", "R$ 180", "1h30"],
-      ["Terapia capilar", "R$ 220", "2h"],
-      ["Cronograma capilar", "Sob consulta", "Avaliação"],
-    ],
-  },
-  {
-    id: "producoes",
-    label: "04 / Produções",
-    title: "Para os dias que merecem mais.",
-    description:
-      "Penteados e finalizações com presença para celebrações, eventos e momentos importantes.",
-    image:
-      "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?auto=format&fit=crop&w=1000&q=85",
-    services: [
-      ["Penteado social", "A partir de R$ 180", "2h"],
-      ["Penteado para noivas", "Sob consulta", "Avaliação"],
-      ["Produção para evento", "A partir de R$ 260", "3h"],
-      ["Tranças e coques", "A partir de R$ 150", "1h30"],
-    ],
-  },
-];
-
-export default function ServicesPage() {
-  return (
-    <main className="catalog-page">
-      <header className="site-header">
-        <PublicBrand />
-        <nav className="main-nav" aria-label="Navegação principal">
-          <a href="/">Início</a>
-          <a className="active" href="/servicos">
-            Serviços
-          </a>
-          <a href="/trabalhos">Trabalhos</a>
-          <a href="/#studio">O studio</a>
-          <a href="/contato">Contato</a>
-          <a href="/minha-conta">Minha conta</a>
-        </nav>
-        <a className="header-cta" href="/agendar">
-          Agendar horário <span>↗</span>
-        </a>
-      </header>
-
-      <section className="catalog-hero">
-        <div>
-          <p className="eyebrow">
-            O menu de cuidados <span>✦</span>
-          </p>
-          <h1>
-            Escolha o que
-            <br />
-            <em>faz sentido para você.</em>
-          </h1>
-          <p>
-            Do corte à transformação completa, cada serviço começa com escuta e
-            termina com um resultado que tem a sua cara.
-          </p>
-        </div>
-        <div className="catalog-index" aria-label="Categorias de serviços">
-          {categories.map((category) => (
-            <a href={`#${category.id}`} key={category.id}>
-              <span>{category.label.split(" /")[0]}</span>
-              {category.label.split(" / ")[1]} <i>↘</i>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <section className="catalog-list">
-        {categories.map((category, index) => (
-          <article
-            className="catalog-category"
-            id={category.id}
-            key={category.id}
-          >
-            <div className="category-image">
-              <img src={category.image} alt="" />
-            </div>
-            <div className="category-content">
-              <p className="eyebrow">
-                {category.label} <span>✦</span>
-              </p>
-              <h2>{category.title}</h2>
-              <p className="category-description">{category.description}</p>
-              <div className="service-list">
-                {category.services.map(([name, price, duration]) => (
-                  <a href="/agendar" className="service-row" key={name}>
-                    <span>{name}</span>
-                    <small>{duration}</small>
-                    <strong>{price}</strong>
-                    <i>↗</i>
-                  </a>
-                ))}
-              </div>
-              <a className="button button-gold" href="/agendar">
-                Agendar este cuidado <span>↗</span>
-              </a>
-            </div>
-            <span className="category-index">0{index + 1}</span>
-          </article>
-        ))}
-      </section>
-
-      <section className="catalog-note">
-        <p className="eyebrow">
-          Uma conversa antes de tudo <span>✦</span>
-        </p>
-        <h2>
-          Não sabe qual escolher?
-          <br />
-          <em>A gente te orienta.</em>
-        </h2>
-        <p>
-          Alguns procedimentos dependem do comprimento, volume e histórico do
-          cabelo. Fale com a gente para receber uma indicação personalizada.
-        </p>
-        <PublicWhatsappLink className="outline-link">Conversar pelo WhatsApp <span>↗</span></PublicWhatsappLink>
-      </section>
-
-      <footer className="site-footer">
-        <div className="footer-bottom">
-          <span>© 2026 <PublicStudioName /></span>
-          <span>Seg–Sáb · 09h às 19h</span>
-          <a href="#top">Voltar ao topo ↑</a>
-        </div>
-      </footer>
-    </main>
-  );
+/* eslint-disable @next/next/no-html-link-for-pages -- public navigation follows the existing native-link flow. */
+export const dynamic = "force-dynamic";
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getPublicSettings();
+  return { title: `Serviços | ${settings.salonName}`, description: `Conheça os serviços e valores de ${settings.salonName}.` };
+}
+async function loadCatalog() {
+  try {
+    const db = await getDb();
+    const rows = await db.select({ id: services.id, name: services.name, description: services.description, duration: services.durationMinutes, price: services.priceCents, priceType: services.priceType, categoryId: serviceCategories.id, category: serviceCategories.name })
+      .from(services).leftJoin(serviceCategories, eq(serviceCategories.id, services.categoryId))
+      .where(eq(services.active, true)).orderBy(asc(serviceCategories.displayOrder), asc(services.name));
+    const groups = new Map<string, { id: string; name: string; services: typeof rows }>();
+    for (const service of rows) {
+      const key = service.categoryId || "outros";
+      if (!groups.has(key)) groups.set(key, { id: key, name: service.category || "Cuidados do studio", services: [] });
+      groups.get(key)!.services.push(service);
+    }
+    return { groups: [...groups.values()], error: false };
+  } catch { return { groups: [], error: true }; }
+}
+export default async function ServicesPage() {
+  const { groups, error } = await loadCatalog();
+  return <main className="catalog-page" id="top">
+    <header className="site-header"><PublicBrand /><nav className="main-nav" aria-label="Navegação principal"><a href="/">Início</a><a href="/servicos" aria-current="page">Serviços</a><a href="/trabalhos">Trabalhos</a><a href="/contato">Contato</a><a href="/minha-conta">Minha conta</a></nav><a className="header-cta" href="/agendar">Agendar horário ↗</a></header>
+    <section className="catalog-hero"><div><h1>O cuidado<br />que é seu.</h1><p>Conheça os serviços do studio, confira os valores e escolha o seu próximo atendimento.</p></div>{groups.length > 0 && <nav className="catalog-index" aria-label="Categorias de serviços">{groups.map(group => <a href={`#categoria-${group.id}`} key={group.id}>{group.name} <i aria-hidden="true">↓</i></a>)}</nav>}</section>
+    <section className="live-catalog" aria-label="Serviços disponíveis">
+      {groups.map(group => <section className="live-catalog-category" id={`categoria-${group.id}`} key={group.id} aria-labelledby={`titulo-${group.id}`}><h2 id={`titulo-${group.id}`}>{group.name}</h2><div>{group.services.map(service => <article key={service.id}><div><h3>{service.name}</h3><p>{service.description}</p></div><div className="live-service-details"><span>{service.duration >= 60 ? `${Math.floor(service.duration / 60)}h${service.duration % 60 ? String(service.duration % 60).padStart(2, "0") : ""}` : `${service.duration} min`}</span><strong>{service.price === null ? "Sob consulta" : `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.price / 100)}`}</strong><a className="button button-gold" href={`/agendar?service=${encodeURIComponent(service.id)}`}>Agendar serviço ↗</a></div></article>)}</div></section>)}
+      {!groups.length && <div className="catalog-empty" role={error ? "status" : undefined}><h2>{error ? "Vamos tentar novamente?" : "Seu cuidado começa com uma conversa."}</h2><p>{error ? "Não foi possível consultar os serviços agora. Tente novamente ou fale com o studio." : "Entre em contato para consultar os atendimentos disponíveis."}</p><PublicWhatsappLink className="button">Falar com o studio ↗</PublicWhatsappLink></div>}
+    </section>
+    <section className="catalog-note"><h2>Qual serviço escolher?</h2><p>Conte para o studio o que você deseja para o seu cabelo. Vamos orientar sua escolha antes do agendamento.</p><PublicWhatsappLink className="outline-link">Conversar pelo WhatsApp ↗</PublicWhatsappLink></section>
+    <footer className="site-footer"><div className="footer-bottom"><span>© {new Date().getFullYear()} <PublicStudioName /></span><a href="/privacidade">Privacidade</a><a href="#top">Voltar ao topo ↑</a></div></footer>
+  </main>;
 }

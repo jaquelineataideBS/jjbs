@@ -29,52 +29,20 @@ export default function PwaInstallInvitation() {
   const [isIos, setIsIos] = useState(false);
 
   useEffect(() => {
-    let reloadPending = false;
-    const hadController = Boolean(navigator.serviceWorker?.controller);
-    const handleControllerChange = () => {
-      if (!hadController || reloadPending) return;
-      reloadPending = true;
-      window.location.reload();
-    };
-
-    navigator.serviceWorker?.addEventListener(
-      "controllerchange",
-      handleControllerChange,
-    );
-    void navigator.serviceWorker
-      ?.register("/sw.js", { updateViaCache: "none" })
-      .then((registration) => {
-        void registration.update();
-        registration.waiting?.postMessage({ type: "SKIP_WAITING" });
-      })
-      .catch(() => undefined);
-
     if (window.location.pathname.startsWith("/admin") || isStandalone()) {
-      return () =>
-        navigator.serviceWorker?.removeEventListener(
-          "controllerchange",
-          handleControllerChange,
-        );
+      return;
     }
 
     const isMobile =
       window.matchMedia("(max-width: 820px)").matches ||
       /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isMobile) {
-      return () =>
-        navigator.serviceWorker?.removeEventListener(
-          "controllerchange",
-          handleControllerChange,
-        );
+      return;
     }
 
     const dismissedAt = Number(window.localStorage.getItem(DISMISS_KEY) ?? 0);
     if (dismissedAt && Date.now() - dismissedAt < DISMISS_FOR_MS) {
-      return () =>
-        navigator.serviceWorker?.removeEventListener(
-          "controllerchange",
-          handleControllerChange,
-        );
+      return;
     }
 
     const iosDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -100,10 +68,6 @@ export default function PwaInstallInvitation() {
     );
 
     return () => {
-      navigator.serviceWorker?.removeEventListener(
-        "controllerchange",
-        handleControllerChange,
-      );
       window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
       window.removeEventListener("appinstalled", handleInstalled);
       window.clearTimeout(inviteTimer);
@@ -130,7 +94,7 @@ export default function PwaInstallInvitation() {
     <aside
       className="pwa-install-card"
       role="dialog"
-      aria-modal="true"
+
       aria-labelledby="pwa-install-title"
     >
       <button

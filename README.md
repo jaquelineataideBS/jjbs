@@ -146,3 +146,12 @@ npm.cmd run admin:password-reset
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
 - [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+
+## Validação do app
+
+O build de produção atual usa Next.js: `npm.cmd run build`. A suíte completa roda com `npm.cmd test`.
+Para incluir o teste HTTP da página inicial, inicie o build de produção e defina `TEST_BASE_URL` com sua URL antes de executar os testes. Sem essa variável, apenas o teste HTTP é marcado como pendente; os testes de regras e de PWA continuam sendo executados.
+
+As fotos de celular são preparadas no navegador antes do envio (arquivo original de até 25 MB; imagem enviada de até 3 MB). JPEG, PNG e WebP são processados diretamente; HEIC/HEIF dependem da capacidade de decodificação do navegador, com orientação para usar JPEG quando não houver suporte. O servidor continua validando a assinatura e o limite do arquivo recebido.
+
+O service worker armazena somente assets com hash e a página neutra de conexão indisponível. Páginas, APIs e fotos mutáveis não usam esse cache. Atualizações são verificadas ao retornar ao app; uma versão nova oferece o botão de atualização sem descartar formulários abertos.

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./app-interface.css";
+import PwaUpdateManager from "./pwa-update-manager";
 import PwaInstallInvitation from "./pwa-install-invitation";
 import { PublicSettingsProvider } from "./public-settings";
 import { getPublicSettings } from "../lib/public-settings";
@@ -54,6 +56,7 @@ export default async function RootLayout({
         <PublicSettingsProvider initial={settings}>
           {children}
           <PwaInstallInvitation />
+          <PwaUpdateManager />
         </PublicSettingsProvider>
         <script
           type="application/ld+json"

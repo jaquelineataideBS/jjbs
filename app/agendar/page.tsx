@@ -77,9 +77,9 @@ const fallbackServices: Service[] = [
   },
 ];
 const fallbackProfessional: Professional = {
-  id: "jaqueline-justino",
-  name: "Jaqueline Justino",
-  title: "Fundadora & hairstylist",
+  id: "",
+  name: "A confirmar",
+  title: null,
 };
 const steps = [
   "Serviço",
@@ -127,9 +127,7 @@ export default function BookingPage() {
   const settings = usePublicSettings();
   const dateOptions = useMemo(() => buildDateOptions(), []);
   const [services, setServices] = useState(fallbackServices);
-  const [professionals, setProfessionals] = useState<Professional[]>([
-    fallbackProfessional,
-  ]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [step, setStep] = useState(1);
   const [serviceId, setServiceId] = useState(fallbackServices[0].id);
@@ -256,13 +254,14 @@ export default function BookingPage() {
         } else {
           setProfessionals([]);
           setProfessionalId("");
+          setAvailabilityNote("Nenhuma profissional está disponível para este serviço. Fale com o studio para receber orientação.");
         }
         const nextSlots = Array.isArray(result.slots)
           ? (result.slots as string[])
           : [];
         setSlots(nextSlots);
         setTime((current) => (nextSlots.includes(current) ? current : ""));
-        if (!nextSlots.length && professionalId)
+        if (!nextSlots.length && professionalId && nextProfessionals.length)
           setAvailabilityNote(
             "Não há horários livres nesta data para este serviço.",
           );
@@ -477,6 +476,8 @@ export default function BookingPage() {
                       key={service.id}
                       onClick={() => {
                         setServiceId(service.id);
+                        setProfessionals([]);
+                        setProfessionalId("");
                         setTime("");
                         setCouponCode("");
                         setAppliedCoupon(null);

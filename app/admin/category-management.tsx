@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- categorias protegidas são carregadas após autenticação. */
 
+import { revealEditor } from "../../lib/editor-navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 type Category = { id: string; name: string; serviceCount: number };
@@ -57,6 +58,7 @@ export default function CategoryManagement({ onChanged }: { onChanged: () => voi
   }
 
   function edit(category: Category) {
+    revealEditor(".category-form");
     setEditing(category);
     setName(category.name);
     setMessage("");

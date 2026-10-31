@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- dados administrativos são carregados após autenticação. */
 
+import { revealEditor } from "../../lib/editor-navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
 
@@ -147,6 +148,7 @@ export default function ClientManagement() {
   }, []);
 
   function edit(client: Client) {
+    revealEditor(".admin-client-form");
     setForm({
       id: client.id,
       name: client.name,

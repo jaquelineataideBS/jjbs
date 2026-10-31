@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
           { key: "Service-Worker-Allowed", value: "/" },
         ],
       },
+      ...["auth", "admin", "account", "settings", "booking-options", "availability", "portfolio"].map(resource => ({
+        source: `/api/${resource}/:path*`,
+        headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }],
+      })),
     ];
   },
 };

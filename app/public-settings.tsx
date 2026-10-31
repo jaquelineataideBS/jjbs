@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import type { PublicSettings } from "../lib/public-settings";
 import { instagramHref, whatsappHref } from "../lib/public-links";
@@ -27,8 +28,15 @@ export function PublicSettingsProvider({
         })
         .catch(() => undefined);
     refresh();
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
     window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    window.addEventListener("studio-settings-updated", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("studio-settings-updated", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   const style = {
@@ -62,7 +70,7 @@ export function PublicBrand({
     settings.salonName.replace(/Beauty Studio$/i, "").trim() ||
     settings.salonName;
   return (
-    <a
+    <><PublicMobileNavigation /><a
       className={className}
       href={href}
       aria-label={`${settings.salonName} - início`}
@@ -77,7 +85,7 @@ export function PublicBrand({
         <strong>{displayName}</strong>
         <small>Beauty Studio</small>
       </span>
-    </a>
+    </a></>
   );
 }
 
@@ -103,4 +111,13 @@ export function PublicMapLink() {
   const settings = usePublicSettings();
   const href = settings.address ? `https://maps.google.com/?q=${encodeURIComponent(settings.address)}` : "/contato";
   return <a className="text-link dark-link" href={href} target={settings.address ? "_blank" : undefined} rel={settings.address ? "noreferrer" : undefined}>Abrir no mapa <span>↗</span></a>;
+}
+
+function PublicMobileNavigation() {
+  return <details className="public-mobile-menu" onClick={event => {
+    if ((event.target as HTMLElement).closest("a")) event.currentTarget.open = false;
+  }}><summary>Menu</summary><nav aria-label="Navegação no celular">
+    <Link href="/">Início</Link><a href="/servicos">Serviços</a><a href="/trabalhos">Trabalhos</a>
+    <a href="/agendar">Agendar horário</a><a href="/minha-conta">Minha conta</a><a href="/contato">Contato</a>
+  </nav></details>;
 }

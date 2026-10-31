@@ -2,6 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- usuários protegidos são carregados após autenticação. */
 
+import { revealEditor } from "../../lib/editor-navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
 
@@ -48,6 +49,7 @@ export default function UsersManagement() {
   }, [data, query]);
 
   function edit(user: InternalUser) {
+    revealEditor(".users-form");
     setForm({ id: user.id, name: user.name, email: user.email, phone: formatWhatsapp(user.phone ?? ""), role: user.role, status: user.status, professionalId: user.professionalId ?? "", password: "" });
     setFeedback(""); setError("");
   }
