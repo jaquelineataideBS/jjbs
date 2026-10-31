@@ -12,6 +12,13 @@ export type PushNotice = {
   url: string;
 };
 
+export type PushDeliveryResult = {
+  attempted: number;
+  succeeded: number;
+  failedCodes: string[];
+  reason?: "missing-credentials" | "no-users" | "no-installations";
+};
+
 function getFirebaseAdminApp() {
   const credentials = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!credentials) return null;
@@ -29,18 +36,23 @@ function getFirebaseAdminApp() {
     );
 }
 
-export async function sendPushToUsers(userIds: string[], notice: PushNotice) {
-  if (!userIds.length || !process.env.FIREBASE_SERVICE_ACCOUNT_JSON) return 0;
+export async function sendPushToUsersDetailed(userIds: string[], notice: PushNotice): Promise<PushDeliveryResult> {
+  if (!userIds.length) return { attempted: 0, succeeded: 0, failedCodes: [], reason: "no-users" };
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    return { attempted: 0, succeeded: 0, failedCodes: [], reason: "missing-credentials" };
+  }
   const db = await getDb();
   const installations = await db
     .select({ fid: pushInstallations.fid })
     .from(pushInstallations)
     .where(inArray(pushInstallations.userId, [...new Set(userIds)].slice(0, 1000)))
     .limit(500);
-  if (!installations.length) return 0;
+  if (!installations.length) {
+    return { attempted: 0, succeeded: 0, failedCodes: [], reason: "no-installations" };
+  }
 
   const app = getFirebaseAdminApp();
-  if (!app) return 0;
+  if (!app) return { attempted: 0, succeeded: 0, failedCodes: [], reason: "missing-credentials" };
   const messaging = getMessaging(app);
   const messages: Message[] = installations.map(({ fid }) => ({
     fid,
@@ -61,14 +73,35 @@ export async function sendPushToUsers(userIds: string[], notice: PushNotice) {
   if (invalidFids.length) {
     await db.delete(pushInstallations).where(inArray(pushInstallations.fid, invalidFids));
   }
-  return result.successCount;
+  return {
+    attempted: result.responses.length,
+    succeeded: result.successCount,
+    failedCodes: result.responses.flatMap((response) => response.success ? [] : [response.error?.code ?? "unknown"]),
+  };
+}
+
+export async function sendPushToUsers(userIds: string[], notice: PushNotice) {
+  return (await sendPushToUsersDetailed(userIds, notice)).succeeded;
 }
 
 export async function sendAppointmentPush(userIds: string[], notice: PushNotice) {
   try {
-    return await sendPushToUsers(userIds, notice);
-  } catch {
+    const result = await sendPushToUsersDetailed(userIds, notice);
+    if (result.reason || result.failedCodes.length) {
+      console.error("[push] appointment delivery incomplete", {
+        reason: result.reason,
+        attempted: result.attempted,
+        succeeded: result.succeeded,
+        failedCodes: result.failedCodes,
+      });
+    }
+    return result.succeeded;
+  } catch (error) {
     // Push delivery is best effort; the appointment and its in-app notice stay saved in Neon.
+    console.error("[push] appointment delivery failed", {
+      code: typeof error === "object" && error && "code" in error ? error.code : "unknown",
+      message: error instanceof Error ? error.message : "Unknown Firebase push error",
+    });
     return 0;
   }
 }

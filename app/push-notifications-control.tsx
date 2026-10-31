@@ -116,6 +116,34 @@ export default function PushNotificationsControl({ audience }: Props) {
     }
   }
 
+  async function sendTestNotification() {
+    setWorking(true);
+    setFeedback("");
+    try {
+      const response = await fetch("/api/account/push-installations/test", {
+        method: "POST",
+        cache: "no-store",
+      });
+      const result: unknown = await response.json().catch(() => ({}));
+      const message = typeof result === "object" && result && "message" in result && typeof result.message === "string"
+        ? result.message
+        : "Não foi possível testar as notificações.";
+      if (!response.ok) {
+        const codes = typeof result === "object" && result && "codes" in result && Array.isArray(result.codes)
+          ? result.codes.filter((code): code is string => typeof code === "string")
+          : [];
+        throw new Error(codes.length ? `${message} (${codes.join(", ")})` : message);
+      }
+      setFeedback(`${message} Confira as notificações do celular.`);
+      setIsError(false);
+    } catch (reason) {
+      setFeedback(reason instanceof Error ? reason.message : "Não foi possível testar as notificações.");
+      setIsError(true);
+    } finally {
+      setWorking(false);
+    }
+  }
+
   return (
     <section className={`push-notifications-control ${audience === "studio" ? "push-notifications-studio" : "push-notifications-client"}`} aria-label="Preferências de notificações push">
       <div className="push-notifications-copy">
@@ -133,7 +161,14 @@ export default function PushNotificationsControl({ audience }: Props) {
       ) : permission === "unsupported" ? (
         <small className="push-setup-note">Este navegador não oferece suporte a notificações push.</small>
       ) : fid ? (
-        <button className="text-button" type="button" onClick={() => void deactivate()} disabled={working}>{working ? "Desativando…" : "Desativar neste dispositivo"}</button>
+        <>
+          {audience === "studio" && (
+            <button className="text-button" type="button" onClick={() => void sendTestNotification()} disabled={working}>
+              {working ? "Enviando teste…" : "Enviar notificação de teste"}
+            </button>
+          )}
+          <button className="text-button" type="button" onClick={() => void deactivate()} disabled={working}>{working ? "Desativando…" : "Desativar neste dispositivo"}</button>
+        </>
       ) : permission === "denied" ? (
         <small className="push-setup-note">Permissão bloqueada. Altere-a nas configurações do navegador.</small>
       ) : (
