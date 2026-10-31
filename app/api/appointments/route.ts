@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, lt, ne, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { appointmentServices, appointments, blockedTimes, businessHours, clients, professionalServices, professionals, services } from "../../../db/schema";
+import { appointmentServices, appointments, blockedTimes, businessHours, clients, notifications, professionalServices, professionals, services } from "../../../db/schema";
 import { getCurrentUser } from "../../../lib/auth";
 import { normalizeWhatsapp } from "../../../lib/masks";
 import { normalizeCoupon, validateCoupon } from "../../../lib/promotions";
@@ -175,17 +175,34 @@ export async function POST(request: Request) {
       priceCents: service.priceCents,
       durationMinutes: service.durationMinutes,
     };
+    const appointmentNotification = currentUser
+      ? db.insert(notifications).values({
+          id: crypto.randomUUID(),
+          userId: currentUser.id,
+          appointmentId,
+          title: rescheduledAppointment ? "Agendamento atualizado" : "Solicitação recebida",
+          message: rescheduledAppointment
+            ? `Seu horário para ${service.name} foi alterado para ${payload.appointmentDate.split("-").reverse().join("/")}, às ${payload.startTime}. O studio confirmará a disponibilidade.`
+            : `Recebemos sua solicitação para ${service.name} em ${payload.appointmentDate.split("-").reverse().join("/")}, às ${payload.startTime}. O studio confirmará seu horário pelo WhatsApp.`,
+          type: rescheduledAppointment ? "reschedule" : "confirmation",
+          channel: "in_app",
+          status: "sent",
+          sentAt: new Date(),
+        })
+      : null;
 
     if (rescheduledAppointment) {
       await db.batch([
         db.insert(appointments).values(appointmentValues),
         db.insert(appointmentServices).values(appointmentServiceValues),
         db.update(appointments).set({ status: "rescheduled", updatedAt: new Date() }).where(and(eq(appointments.id, rescheduledAppointment.id), inArray(appointments.status, ["pending_confirmation", "confirmed"]))),
+        ...(appointmentNotification ? [appointmentNotification] : []),
       ]);
     } else if (linkedClient) {
       await db.batch([
         db.insert(appointments).values(appointmentValues),
         db.insert(appointmentServices).values(appointmentServiceValues),
+        ...(appointmentNotification ? [appointmentNotification] : []),
       ]);
     } else {
       await db.batch([
@@ -200,6 +217,7 @@ export async function POST(request: Request) {
         }),
         db.insert(appointments).values(appointmentValues),
         db.insert(appointmentServices).values(appointmentServiceValues),
+        ...(appointmentNotification ? [appointmentNotification] : []),
       ]);
     }
 
