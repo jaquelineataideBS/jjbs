@@ -103,9 +103,31 @@ export async function listenForForegroundPush(onPush: (message: ForegroundPush) 
   if (!firebaseVapidKey || !("Notification" in window)) return () => undefined;
   const [{ client }, service] = await Promise.all([messagingClient(), import("firebase/messaging")]);
   if (!(await service.isSupported())) return () => undefined;
-  return service.onMessage(client, (payload) => onPush({
-    title: payload.data?.title ?? "Jaqueline Beauty Studio",
-    body: payload.data?.body ?? "Você recebeu uma nova notificação.",
-    url: payload.data?.url ?? "/minha-conta#notificacoes",
-  }));
+  return service.onMessage(client, (payload) => {
+    const notice = {
+      title: payload.data?.title ?? "Jaqueline Beauty Studio",
+      body: payload.data?.body ?? "Você recebeu uma nova notificação.",
+      url: payload.data?.url ?? "/minha-conta#notificacoes",
+    };
+    onPush(notice);
+
+    // Foreground messages do not create an OS notification automatically.
+    // Use the FCM service worker so the test and appointment alerts are visible
+    // on mobile even while the admin page is open.
+    if (Notification.permission === "granted" && "serviceWorker" in navigator) {
+      void navigator.serviceWorker.getRegistration("/fcm/").then((registration) => {
+        if (!registration) return;
+        const target = new URL(notice.url, window.location.origin);
+        const safeUrl = target.origin === window.location.origin
+          ? `${target.pathname}${target.search}${target.hash}`
+          : "/";
+        return registration.showNotification(notice.title, {
+          body: notice.body,
+          icon: "/pwa-icon-192.png",
+          badge: "/pwa-icon-192.png",
+          data: { url: safeUrl },
+        });
+      }).catch(() => undefined);
+    }
+  });
 }
