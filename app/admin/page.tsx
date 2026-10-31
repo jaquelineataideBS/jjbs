@@ -17,6 +17,7 @@ import UsersManagement from "./users-management";
 import type { Permission } from "../../lib/permissions";
 import { formatWhatsapp } from "../../lib/masks";
 import { PublicBrand } from "../public-settings";
+import PushNotificationsControl from "../push-notifications-control";
 
 type Appointment = {
   id: string;
@@ -624,6 +625,7 @@ export default function AdminPage() {
         </div>
       </header>
       <section className="admin-shell">
+        {data && <PushNotificationsControl audience="studio" />}
         <div className="admin-heading">
           <div>
             <p className="eyebrow">

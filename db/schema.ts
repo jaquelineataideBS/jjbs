@@ -538,6 +538,23 @@ export const notifications = pgTable(
   }),
 );
 
+export const pushInstallations = pgTable(
+  "push_installations",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    fid: text("fid").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => ({
+    fidUnique: uniqueIndex("push_installations_fid_unique").on(table.fid),
+    userIndex: index("push_installations_user_idx").on(table.userId),
+  }),
+);
+
 export const reviews = pgTable(
   "reviews",
   {

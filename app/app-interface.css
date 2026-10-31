@@ -52,6 +52,16 @@
 .admin-page :is(.admin-service-form,.category-form,.reviews-admin-grid aside):focus-within{border-color:var(--gold)}
 .admin-page .admin-portfolio-preview{border-radius:12px;padding:12px}
 .admin-page .admin-portfolio-preview img{height:auto;max-height:300px;border-radius:8px}
+.push-notifications-control{display:grid;gap:12px;padding:16px;border:1px solid var(--ui-border,#dedbd1);border-radius:12px;background:var(--ui-surface,#fff);color:var(--ui-text,#292720);font-size:14px;line-height:1.5}
+.push-notifications-copy strong{display:block;font-size:15px}
+.push-notifications-copy p{margin:4px 0 0;color:var(--ui-muted,#716d62)}
+.push-notifications-control .text-button{justify-self:start;min-height:44px}
+.push-marketing-consent{display:flex;align-items:flex-start;gap:10px;color:var(--ui-muted,#5f5b52);font-size:14px;line-height:1.5}
+.push-marketing-consent input{width:18px;height:18px;flex:none;margin:2px 0 0;accent-color:var(--gold,#987519)}
+.push-setup-note,.push-feedback{font-size:13px;line-height:1.5;color:var(--ui-muted,#625f56)}
+.push-feedback.error{color:#a43f32}
+.push-notifications-studio{margin-bottom:22px}
+.account-notifications-card .push-notifications-control{margin-top:20px}
 .admin-page .admin-portfolio-previews{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .admin-page .admin-portfolio-previews .admin-portfolio-preview{min-width:0;margin:0}
 .works-page .work-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}

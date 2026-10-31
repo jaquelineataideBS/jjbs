@@ -1,10 +1,12 @@
 import { and, eq, gt, inArray, lt, ne, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { appointmentServices, appointments, blockedTimes, businessHours, clients, notifications, professionalServices, professionals, services } from "../../../db/schema";
+import { appointmentServices, appointments, blockedTimes, businessHours, clients, notifications, professionalServices, professionals, services, users } from "../../../db/schema";
 import { getCurrentUser } from "../../../lib/auth";
 import { normalizeWhatsapp } from "../../../lib/masks";
 import { normalizeCoupon, validateCoupon } from "../../../lib/promotions";
 import { getPublicSettings } from "../../../lib/public-settings";
+import { sendAppointmentPush } from "../../../lib/firebase-push";
+import { internalRoles } from "../../../lib/permissions";
 import { addMinutes, isClockTime, rangesOverlap, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const blockedStatuses = ["cancelled_by_client", "cancelled_by_salon"];
@@ -175,6 +177,22 @@ export async function POST(request: Request) {
       priceCents: service.priceCents,
       durationMinutes: service.durationMinutes,
     };
+    const studioUsers = await db.select({ id: users.id }).from(users).where(and(
+      eq(users.status, "active"),
+      inArray(users.role, [...internalRoles]),
+    )).limit(100);
+    const studioNotificationValues = studioUsers.map((studioUser) => ({
+      id: crypto.randomUUID(),
+      userId: studioUser.id,
+      appointmentId,
+      title: rescheduledAppointment ? "Novo pedido de reagendamento" : "Novo agendamento",
+      message: `Chegou um pedido para ${payload.appointmentDate.split("-").reverse().join("/")}, às ${payload.startTime}. Abra a agenda para conferir.`,
+      type: rescheduledAppointment ? "reschedule" : "appointment_request",
+      channel: "in_app",
+      status: "sent",
+      sentAt: new Date(),
+      createdBy: currentUser?.id ?? null,
+    }));
     const appointmentNotification = currentUser
       ? db.insert(notifications).values({
           id: crypto.randomUUID(),
@@ -197,12 +215,14 @@ export async function POST(request: Request) {
         db.insert(appointmentServices).values(appointmentServiceValues),
         db.update(appointments).set({ status: "rescheduled", updatedAt: new Date() }).where(and(eq(appointments.id, rescheduledAppointment.id), inArray(appointments.status, ["pending_confirmation", "confirmed"]))),
         ...(appointmentNotification ? [appointmentNotification] : []),
+        ...(studioNotificationValues.length ? [db.insert(notifications).values(studioNotificationValues)] : []),
       ]);
     } else if (linkedClient) {
       await db.batch([
         db.insert(appointments).values(appointmentValues),
         db.insert(appointmentServices).values(appointmentServiceValues),
         ...(appointmentNotification ? [appointmentNotification] : []),
+        ...(studioNotificationValues.length ? [db.insert(notifications).values(studioNotificationValues)] : []),
       ]);
     } else {
       await db.batch([
@@ -218,8 +238,15 @@ export async function POST(request: Request) {
         db.insert(appointments).values(appointmentValues),
         db.insert(appointmentServices).values(appointmentServiceValues),
         ...(appointmentNotification ? [appointmentNotification] : []),
+        ...(studioNotificationValues.length ? [db.insert(notifications).values(studioNotificationValues)] : []),
       ]);
     }
+
+    await sendAppointmentPush(studioUsers.map((studioUser) => studioUser.id), {
+      title: rescheduledAppointment ? "Novo pedido de reagendamento" : "Novo agendamento",
+      body: `Novo pedido para ${payload.appointmentDate.split("-").reverse().join("/")}, às ${payload.startTime}.`,
+      url: "/admin",
+    });
 
     return json({ appointmentId, status: "pending_confirmation", promotion: appliedPromotion, rescheduledFromId: rescheduledAppointment?.id }, 201);
   } catch (error) {

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
 import AccountReviews from "./account-reviews";
 import { PublicBrand } from "../public-settings";
+import PushNotificationsControl from "../push-notifications-control";
 
 type AccountUser = {
   id: string;
@@ -664,7 +665,7 @@ export default function MyAccountPage() {
                 Ver promoções ativas <span>→</span>
               </a>
             </article>
-            <article className="account-card account-notifications-card">
+            <article className="account-card account-notifications-card" id="notificacoes">
               <span className="account-card-label">Notificações</span>
               {accountNotifications.length ? (
                 <>
@@ -694,6 +695,7 @@ export default function MyAccountPage() {
                   Seus lembretes e confirmações aparecerão aqui.
                 </p>
               )}
+              {user.role === "client" && <PushNotificationsControl audience="client" />}
             </article>
             <AccountReviews />
             {user.role === "admin" && (

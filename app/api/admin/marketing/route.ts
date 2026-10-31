@@ -10,6 +10,7 @@ import {
   services,
 } from "../../../../db/schema";
 import { requireAdmin } from "../../../../lib/admin";
+import { announcePromotion } from "../../../../lib/firebase-push";
 
 const discountTypes = new Set(["percentage", "fixed", "combo"]);
 const audiences = new Set(["all", "birthday", "first_visit", "off_peak"]);
@@ -110,6 +111,9 @@ export async function POST(request: Request) {
     const [promotion] = await db.insert(promotions).values({ id, createdBy: admin.id, ...values }).returning();
     if (serviceIds.length) await db.insert(promotionServices).values(serviceIds.map((serviceId) => ({ id: crypto.randomUUID(), promotionId: id, serviceId })));
     await db.insert(auditLogs).values({ id: crypto.randomUUID(), userId: admin.id, action: "promotion.created", entity: "promotion", entityId: id, metadata: { serviceIds } });
+    if (promotion.active) {
+      try { await announcePromotion(promotion, admin.id); } catch { /* A publicação segue disponível se o envio de avisos falhar. */ }
+    }
     return noStore({ promotion, message: "Promoção criada com sucesso." }, 201);
   } catch (error) {
     const message = error instanceof Error && error.message.includes("promotions_coupon_unique") ? "Este cupom já está em uso." : "Não foi possível salvar agora.";
@@ -124,13 +128,16 @@ export async function PATCH(request: Request) {
     const input = parsePromotion(await request.json());
     if (!input?.id) return noStore({ message: "Revise os dados da promoção." }, 400);
     const db = await getDb();
-    const [current] = await db.select({ id: promotions.id }).from(promotions).where(eq(promotions.id, input.id)).limit(1);
+    const [current] = await db.select({ id: promotions.id, active: promotions.active }).from(promotions).where(eq(promotions.id, input.id)).limit(1);
     if (!current) return noStore({ message: "Promoção não encontrada." }, 404);
     const { id, serviceIds, ...values } = input;
     const [promotion] = await db.update(promotions).set({ ...values, updatedAt: new Date() }).where(eq(promotions.id, id)).returning();
     await db.delete(promotionServices).where(eq(promotionServices.promotionId, id));
     if (serviceIds.length) await db.insert(promotionServices).values(serviceIds.map((serviceId) => ({ id: crypto.randomUUID(), promotionId: id, serviceId })));
     await db.insert(auditLogs).values({ id: crypto.randomUUID(), userId: admin.id, action: "promotion.updated", entity: "promotion", entityId: id, metadata: { serviceIds, active: values.active } });
+    if (!current.active && promotion.active) {
+      try { await announcePromotion(promotion, admin.id); } catch { /* A publicação segue disponível se o envio de avisos falhar. */ }
+    }
     return noStore({ promotion, message: "Promoção atualizada." });
   } catch {
     return noStore({ message: "Não foi possível atualizar a promoção." }, 500);
