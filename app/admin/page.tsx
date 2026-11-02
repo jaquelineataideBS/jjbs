@@ -18,6 +18,7 @@ import type { Permission } from "../../lib/permissions";
 import { formatWhatsapp } from "../../lib/masks";
 import { PublicBrand } from "../public-settings";
 import PushNotificationsControl from "../push-notifications-control";
+import OpenDatesCalendar from "./open-dates-calendar";
 
 type Appointment = {
   id: string;
@@ -1040,6 +1041,7 @@ export default function AdminPage() {
                   </section>
                   {selectedProfessional && (
                     <>
+                      <OpenDatesCalendar key={selectedProfessionalId} professionalId={selectedProfessionalId} weekdays={(schedule?.hours ?? []).filter(hour => hour.professionalId === selectedProfessionalId && hour.active).map(hour => hour.weekday)} />
                       <form
                         className="admin-panel admin-hours-form"
                         onSubmit={saveHours}

@@ -1,6 +1,6 @@
 import { and, asc, eq, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { appointments, blockedTimes, businessHours, professionalServices, professionals, services } from "../../../db/schema";
+import { appointments, blockedTimes, businessHours, openScheduleDates, professionalServices, professionals, services } from "../../../db/schema";
 import { buildAvailableSlots, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const cancelledStatuses = ["cancelled_by_client", "cancelled_by_salon"];
@@ -37,6 +37,8 @@ export async function GET(request: Request) {
       return noStore({ message: "Esta profissional não atende o serviço selecionado." }, 400);
     }
 
+    const [openDate] = await db.select({ id: openScheduleDates.id }).from(openScheduleDates).where(and(eq(openScheduleDates.professionalId, professionalId), eq(openScheduleDates.date, appointmentDate))).limit(1);
+    if (!openDate) return noStore({ professionals: availableProfessionals, slots: [] });
     const hours = await db.select({ startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
       .from(businessHours)
       .where(and(eq(businessHours.professionalId, professionalId), eq(businessHours.weekday, weekdayForDate(appointmentDate)), eq(businessHours.active, true)))

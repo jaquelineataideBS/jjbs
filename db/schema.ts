@@ -285,6 +285,13 @@ export const businessHours = pgTable(
   }),
 );
 
+export const openScheduleDates = pgTable("open_schedule_dates", {
+  id: text("id").primaryKey(),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  date: text("date").notNull(),
+  createdAt: createdAt(),
+}, table => ({ professionalDate: uniqueIndex("open_schedule_dates_professional_date_unique").on(table.professionalId, table.date) }));
+
 export const blockedTimes = pgTable(
   "blocked_times",
   {
