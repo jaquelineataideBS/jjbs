@@ -14,7 +14,7 @@ export function upcomingDates(today: string, count = 14) {
 export async function getPublicSchedule() {
   try {
     const today = todayInFortaleza();
-    const dates = upcomingDates(today);
+    const dates = upcomingDates(today, 366);
     const end = dates[dates.length - 1];
     const db = await getDb();
     const [hours, relations, blocks, bookings] = await Promise.all([

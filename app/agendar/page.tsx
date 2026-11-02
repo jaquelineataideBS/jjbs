@@ -115,7 +115,7 @@ function priceLabel(service: Service) {
 function buildDateOptions() {
   const dates: Array<{ value: string; label: string }> = [];
   const today = new Date(`${todayInFortaleza()}T12:00:00`);
-  for (let offset = 0; dates.length < 14; offset += 1) {
+  for (let offset = 0; dates.length < 366; offset += 1) {
     const date = new Date(today);
     date.setDate(today.getDate() + offset);
     dates.push({ value: dateKey(date), label: dateLabel(date) });
@@ -534,7 +534,7 @@ export default function BookingPage() {
                 <fieldset className="booking-fieldset">
                   <legend>Escolha uma data</legend>
                   <div className="booking-date-grid">
-                    {dateOptions.map((option) => (
+                    {dateOptions.filter((option, index) => index < 14 || option.value === date).map((option) => (
                       <button
                         className={`booking-date-option ${option.value === date ? "selected" : ""}`}
                         type="button"
