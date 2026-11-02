@@ -253,6 +253,7 @@ export default function AdminPage() {
   const [professionalForm, setProfessionalForm] =
     useState<ProfessionalForm>(emptyProfessional);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState("");
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState<string | null>(null);
   const [hoursForm, setHoursForm] = useState<DayHours[]>(defaultHours());
   const [blockForm, setBlockForm] = useState<BlockForm>({
     blockDate: "",
@@ -411,6 +412,7 @@ export default function AdminPage() {
   }
   function editProfessional(professional: Professional) {
     revealEditor("form[data-professional-editor]");
+    if (professional.id !== selectedProfessionalId) setSelectedScheduleDate(null);
     setSelectedProfessionalId(professional.id);
     setProfessionalForm({
       id: professional.id,
@@ -1019,6 +1021,7 @@ export default function AdminPage() {
                             type="button"
                             onClick={() => {
                               setSelectedProfessionalId(professional.id);
+                              setSelectedScheduleDate(null);
                               editProfessional(professional);
                             }}
                           >
@@ -1041,8 +1044,8 @@ export default function AdminPage() {
                   </section>
                   {selectedProfessional && (
                     <>
-                      <OpenDatesCalendar key={selectedProfessionalId} professionalId={selectedProfessionalId} weekdays={(schedule?.hours ?? []).filter(hour => hour.professionalId === selectedProfessionalId && hour.active).map(hour => hour.weekday)} />
-                      <form
+                      <OpenDatesCalendar key={selectedProfessionalId} professionalId={selectedProfessionalId} weekdays={(schedule?.hours ?? []).filter(hour => hour.professionalId === selectedProfessionalId && hour.active).map(hour => hour.weekday)} onSelect={setSelectedScheduleDate} />
+                      {selectedScheduleDate && <form
                         className="admin-panel admin-hours-form"
                         onSubmit={saveHours}
                       >
@@ -1055,13 +1058,13 @@ export default function AdminPage() {
                             </h2>
                           </div>
                           <p>
-                            Escreva a entrada e a saída. Ao completar um
+                            Estes horários se aplicam às datas liberadas no mesmo dia da semana. Escreva a entrada e a saída. Ao completar um
                             período, outro campo aparece para você acrescentar
                             mais um horário.
                           </p>
                         </div>
                         <div className="admin-hours-list">
-                          {hoursForm.map((day) => (
+                          {hoursForm.filter(day => day.weekday === new Date(`${selectedScheduleDate}T12:00:00Z`).getUTCDay()).map((day) => (
                             <section
                               className="admin-hours-day"
                               key={day.weekday}
@@ -1151,7 +1154,7 @@ export default function AdminPage() {
                         >
                           Salvar expediente <span>↗</span>
                         </button>
-                      </form>
+                      </form>}
                       <section className="admin-schedule-blocks">
                         <form
                           className="admin-service-form"
