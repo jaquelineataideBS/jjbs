@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
 import { whatsappHref } from "../../lib/public-links";
 import { PublicBrand, usePublicSettings } from "../public-settings";
+import { todayInFortaleza } from "../../lib/scheduling";
 
 type Service = {
   id: string;
@@ -113,12 +114,11 @@ function priceLabel(service: Service) {
 }
 function buildDateOptions() {
   const dates: Array<{ value: string; label: string }> = [];
-  const today = new Date();
-  for (let offset = 1; dates.length < 10; offset += 1) {
+  const today = new Date(`${todayInFortaleza()}T12:00:00`);
+  for (let offset = 0; dates.length < 14; offset += 1) {
     const date = new Date(today);
     date.setDate(today.getDate() + offset);
-    if (date.getDay() !== 0)
-      dates.push({ value: dateKey(date), label: dateLabel(date) });
+    dates.push({ value: dateKey(date), label: dateLabel(date) });
   }
   return dates;
 }
@@ -166,6 +166,8 @@ export default function BookingPage() {
     const search = new URLSearchParams(window.location.search);
     const requestedServiceId = search.get("service")?.trim() ?? "";
     const requestedProfessionalId = search.get("professional")?.trim() ?? "";
+    const requestedDate = search.get("date")?.trim() ?? "";
+    if (buildDateOptions().some(option => option.value === requestedDate)) setDate(requestedDate);
     setRescheduleId(search.get("reschedule")?.trim() ?? "");
     if (requestedProfessionalId) setProfessionalId(requestedProfessionalId);
 
