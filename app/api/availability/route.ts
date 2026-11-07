@@ -15,13 +15,50 @@ export async function GET(request: Request) {
   const appointmentDate = url.searchParams.get("date")?.trim() ?? "";
   const professionalId = url.searchParams.get("professionalId")?.trim() ?? "";
 
-  if (!serviceId) return noStore({ message: "Escolha um serviço para ver a disponibilidade." }, 400);
+  if (!serviceId && !appointmentDate) return noStore({ message: "Escolha uma data para ver os horários disponíveis." }, 400);
   if (appointmentDate && (!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || appointmentDate < todayInFortaleza())) {
     return noStore({ message: "Escolha uma data válida para o agendamento." }, 400);
   }
 
   try {
     const db = await getDb();
+    if (!serviceId) {
+      const [eligiblePairs, openDates, hours, blockRows, appointmentRows] = await Promise.all([
+        db.select({ professionalId: professionals.id, durationMinutes: services.durationMinutes })
+          .from(professionalServices)
+          .innerJoin(professionals, eq(professionals.id, professionalServices.professionalId))
+          .innerJoin(services, eq(services.id, professionalServices.serviceId))
+          .where(and(eq(professionals.active, true), eq(services.active, true))),
+        db.select({ professionalId: openScheduleDates.professionalId })
+          .from(openScheduleDates)
+          .where(eq(openScheduleDates.date, appointmentDate)),
+        db.select({ professionalId: businessHours.professionalId, startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
+          .from(businessHours)
+          .innerJoin(professionals, eq(professionals.id, businessHours.professionalId))
+          .where(and(eq(businessHours.weekday, weekdayForDate(appointmentDate)), eq(businessHours.active, true), eq(professionals.active, true))),
+        db.select({ professionalId: blockedTimes.professionalId, startTime: blockedTimes.startTime, endTime: blockedTimes.endTime })
+          .from(blockedTimes)
+          .where(eq(blockedTimes.blockDate, appointmentDate)),
+        db.select({ professionalId: appointments.professionalId, startTime: appointments.startTime, endTime: appointments.endTime })
+          .from(appointments)
+          .where(and(eq(appointments.appointmentDate, appointmentDate), notInArray(appointments.status, cancelledStatuses))),
+      ]);
+
+      const openProfessionalIds = new Set(openDates.map((row) => row.professionalId));
+      const slots = new Set<string>();
+      for (const pair of eligiblePairs) {
+        if (pair.durationMinutes <= 0 || !openProfessionalIds.has(pair.professionalId)) continue;
+        const unavailable = [
+          ...blockRows.filter((row) => row.professionalId === pair.professionalId),
+          ...appointmentRows.filter((row) => row.professionalId === pair.professionalId),
+        ];
+        for (const period of hours.filter((row) => row.professionalId === pair.professionalId)) {
+          for (const slot of buildAvailableSlots(period, pair.durationMinutes, unavailable)) slots.add(slot);
+        }
+      }
+      return noStore({ professionals: [], slots: [...slots].sort() });
+    }
+
     const [service] = await db.select({ id: services.id, durationMinutes: services.durationMinutes })
       .from(services).where(and(eq(services.id, serviceId), eq(services.active, true))).limit(1);
     if (!service) return noStore({ message: "Este serviço não está disponível para agendamento." }, 404);
