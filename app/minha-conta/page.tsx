@@ -451,7 +451,7 @@ export default function MyAccountPage() {
                         </strong>
                         <span>
                           {dateLabel(appointment.appointmentDate)} ·{" "}
-                          {appointment.startTime}–{appointment.endTime}
+                          {appointment.startTime}
                         </span>
                         <span>
                           {appointment.professionalName ??

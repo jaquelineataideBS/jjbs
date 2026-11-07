@@ -836,7 +836,7 @@ export default function AdminPage() {
                                   .join("/")}
                               </strong>
                               <small>
-                                {appointment.startTime}–{appointment.endTime}
+                                {appointment.startTime}
                               </small>
                             </td>
                             <td>
