@@ -125,10 +125,10 @@ export async function POST(request: Request) {
       .from(businessHours)
       .where(and(eq(businessHours.professionalId, professional.id), eq(businessHours.weekday, weekdayForDate(payload.appointmentDate)), eq(businessHours.active, true)));
     const selectedRange = { startTime: payload.startTime, endTime };
-    const firstPeriod = [...hours].sort((first, second) => first.startTime.localeCompare(second.startTime))[0];
-    const insideWorkingPeriod = Boolean(firstPeriod &&
-      payload.startTime === firstPeriod.startTime && endTime <= firstPeriod.endTime &&
-      !(firstPeriod.breakStart && firstPeriod.breakEnd && rangesOverlap(selectedRange, { startTime: firstPeriod.breakStart, endTime: firstPeriod.breakEnd })));
+    const insideWorkingPeriod = hours.some((period) =>
+      payload.startTime === period.startTime && endTime <= period.endTime &&
+      !(period.breakStart && period.breakEnd && rangesOverlap(selectedRange, { startTime: period.breakStart, endTime: period.breakEnd })),
+    );
     if (!insideWorkingPeriod) return json({ message: "O horário escolhido está fora do expediente da profissional." }, 400);
 
     const blocked = await db.select({ id: blockedTimes.id }).from(blockedTimes).where(and(

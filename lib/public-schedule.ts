@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, notInArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { appointments, blockedTimes, businessHours, openScheduleDates, professionals, professionalServices, services } from "../db/schema";
-import { buildDailyStartSlots, todayInFortaleza, weekdayForDate } from "./scheduling";
+import { buildConfiguredStartSlots, todayInFortaleza, weekdayForDate } from "./scheduling";
 
 export function upcomingDates(today: string, count = 14) {
   return Array.from({ length: count }, (_, offset) => {
@@ -40,7 +40,7 @@ export async function getPublicSchedule() {
         const durations = relations.filter(row => row.professionalId === professionalId && row.duration > 0).map(row => row.duration);
         if (!durations.length) return false;
         const periods = hours.filter(period => period.professionalId === professionalId && period.weekday === weekdayForDate(date));
-        return buildDailyStartSlots(periods, Math.min(...durations), unavailable.filter(row => row.date === date && row.professionalId === professionalId))
+        return buildConfiguredStartSlots(periods, Math.min(...durations), unavailable.filter(row => row.date === date && row.professionalId === professionalId))
           .some(slot => date !== today || slot > now);
       });
     }), failed: false };

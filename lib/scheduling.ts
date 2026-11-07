@@ -32,23 +32,25 @@ export function todayInFortaleza() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Fortaleza" }).format(new Date());
 }
 
-export function buildDailyStartSlots(periods: { startTime: string; endTime: string; breakStart: string | null; breakEnd: string | null }[], durationMinutes: number, unavailable: TimeRange[]) {
-  const hours = [...periods].sort((first, second) => first.startTime.localeCompare(second.startTime))[0];
-  if (!hours) return [];
+export function buildConfiguredStartSlots(periods: { startTime: string; endTime: string; breakStart: string | null; breakEnd: string | null }[], durationMinutes: number, unavailable: TimeRange[]) {
   if (durationMinutes <= 0) return [];
-  if (timeToMinutes(hours.startTime) + durationMinutes > timeToMinutes(hours.endTime)) return [];
 
-  const range = {
-    startTime: hours.startTime,
-    endTime: addMinutes(hours.startTime, durationMinutes),
-  };
-  const breakRange = hours.breakStart && hours.breakEnd ? { startTime: hours.breakStart, endTime: hours.breakEnd } : null;
+  const slots: string[] = [];
+  for (const hours of [...periods].sort((first, second) => first.startTime.localeCompare(second.startTime))) {
+    if (timeToMinutes(hours.startTime) + durationMinutes > timeToMinutes(hours.endTime)) continue;
 
-  if (range.endTime > hours.endTime) return [];
-  if (breakRange && rangesOverlap(range, breakRange)) return [];
-  if (unavailable.some((item) => rangesOverlap(range, item))) return [];
+    const range = {
+      startTime: hours.startTime,
+      endTime: addMinutes(hours.startTime, durationMinutes),
+    };
+    const breakRange = hours.breakStart && hours.breakEnd ? { startTime: hours.breakStart, endTime: hours.breakEnd } : null;
 
-  return [hours.startTime];
+    if (breakRange && rangesOverlap(range, breakRange)) continue;
+    if (unavailable.some((item) => rangesOverlap(range, item))) continue;
+    slots.push(hours.startTime);
+  }
+
+  return [...new Set(slots)].sort();
 }
 
 export function buildAvailableSlots(hours: { startTime: string; endTime: string; breakStart: string | null; breakEnd: string | null }, durationMinutes: number, unavailable: TimeRange[]) {

@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
+import { isInternalRole } from "../../lib/permissions";
 import AccountReviews from "./account-reviews";
 import { PublicBrand } from "../public-settings";
 import PushNotificationsControl from "../push-notifications-control";
@@ -195,6 +196,10 @@ export default function MyAccountPage() {
         const result = await response.json();
         if (result.user) {
           const accountUser = result.user as AccountUser;
+          if (isInternalRole(accountUser.role)) {
+            window.location.replace("/admin");
+            return;
+          }
           setUser(accountUser);
           setProfile({
             name: accountUser.name,
@@ -254,6 +259,10 @@ export default function MyAccountPage() {
             : "Não foi possível concluir agora.",
         );
       const accountUser = result.user as AccountUser;
+      if (isInternalRole(accountUser.role)) {
+        window.location.replace("/admin");
+        return;
+      }
       setUser(accountUser);
       setProfile({
         name: accountUser.name,
