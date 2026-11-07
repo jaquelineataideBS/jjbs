@@ -81,7 +81,7 @@ export default function ResetPasswordPage() {
             <em>protegido novamente.</em>
           </h1>
           <p>
-            Crie uma senha exclusiva com pelo menos 8 caracteres. Ao concluir,
+            Crie uma senha exclusiva com pelo menos 12 caracteres. Ao concluir,
             todas as sessões antigas serão encerradas.
           </p>
         </div>
@@ -104,7 +104,7 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={12}
                   maxLength={128}
                   required
                 />
@@ -116,7 +116,7 @@ export default function ResetPasswordPage() {
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={12}
                   maxLength={128}
                   required
                 />

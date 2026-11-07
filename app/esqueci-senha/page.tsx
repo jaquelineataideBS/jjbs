@@ -1,42 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { PublicBrand } from "../public-settings";
+import { PublicBrand, usePublicSettings } from "../public-settings";
+import { whatsappHref } from "../../lib/public-links";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok)
-        throw new Error(
-          typeof result.message === "string"
-            ? result.message
-            : "Não foi possível iniciar a recuperação.",
-        );
-      if (typeof result.nextPath !== "string")
-        throw new Error("Não foi possível iniciar a recuperação.");
-      window.location.assign(result.nextPath);
-    } catch {
-      setMessage(
-        "Não encontramos uma conta ativa com esse e-mail ou não foi possível continuar.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const settings = usePublicSettings();
 
   return (
     <main className="account-page">
@@ -57,43 +26,25 @@ export default function ForgotPasswordPage() {
             <em>seu acesso.</em>
           </h1>
           <p>
-            Informe o e-mail da sua conta. A redefinição acontece aqui mesmo,
-            sem envio de mensagem.
+            Para proteger sua conta, o studio confirma sua identidade antes de
+            liberar uma redefinição de senha.
           </p>
         </div>
         <div className="account-auth-card">
           <span className="account-card-label">Redefinir senha</span>
-          <h2>Qual é o seu e-mail?</h2>
+          <h2>Fale com o studio</h2>
           <p className="account-helper">
-            Depois de confirmar o e-mail, você poderá criar uma nova senha neste
-            dispositivo.
+            Entre em contato pelo WhatsApp. Depois da confirmação dos seus
+            dados, o studio enviará um link de uso único.
           </p>
-          <form onSubmit={submit}>
-            <label>
-              E-mail
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                required
-                maxLength={160}
-              />
-            </label>
-            <button
-              className="button button-gold account-submit"
-              type="submit"
-              disabled={submitting}
-            >
-              {submitting ? "Continuando…" : "Continuar para redefinir"}{" "}
-              <span>↗</span>
-            </button>
-          </form>
-          {message && (
-            <p className="account-feedback error" role="alert">
-              {message}
-            </p>
-          )}
+          <a
+            className="button button-gold account-submit"
+            href={whatsappHref(settings.whatsapp)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Falar no WhatsApp <span>↗</span>
+          </a>
           <Link
             className="account-forgot-link recovery-back-link"
             href="/minha-conta"

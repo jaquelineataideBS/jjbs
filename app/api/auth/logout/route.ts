@@ -1,6 +1,8 @@
-import { clearSessionCookie, removeCurrentSession } from "../../../../lib/auth";
+import { clearSessionCookie, isTrustedMutationRequest, removeCurrentSession } from "../../../../lib/auth";
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) return Response.json({ message: "Origem da solicitação inválida." }, { status: 403 });
+
   try {
     await removeCurrentSession(request);
   } catch (error) {

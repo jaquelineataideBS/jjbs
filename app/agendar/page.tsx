@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
 import { whatsappHref } from "../../lib/public-links";
 import { PublicBrand, usePublicSettings } from "../public-settings";
-import { todayInFortaleza } from "../../lib/scheduling";
 
 type Service = {
   id: string;
@@ -90,14 +89,13 @@ const steps = [
   "Revisão",
 ];
 
-function dateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-function dateLabel(date: Date) {
+function dateLabel(value: string) {
+  const date = new Date(`${value}T12:00:00Z`);
   return new Intl.DateTimeFormat("pt-BR", {
     weekday: "short",
     day: "2-digit",
     month: "short",
+    timeZone: "America/Fortaleza",
   })
     .format(date)
     .replace(".", "");
@@ -112,20 +110,15 @@ function priceLabel(service: Service) {
   if (service.priceCents === null) return "Sob consulta";
   return `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.priceCents / 100)}`;
 }
-function buildDateOptions() {
-  const dates: Array<{ value: string; label: string }> = [];
-  const today = new Date(`${todayInFortaleza()}T12:00:00`);
-  for (let offset = 0; dates.length < 366; offset += 1) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + offset);
-    dates.push({ value: dateKey(date), label: dateLabel(date) });
-  }
-  return dates;
-}
-
 export default function BookingPage() {
   const settings = usePublicSettings();
-  const dateOptions = useMemo(() => buildDateOptions(), []);
+  const [openDates, setOpenDates] = useState<string[]>([]);
+  const [datesLoading, setDatesLoading] = useState(true);
+  const [datesError, setDatesError] = useState("");
+  const dateOptions = useMemo(
+    () => openDates.map((value) => ({ value, label: dateLabel(value) })),
+    [openDates],
+  );
   const [services, setServices] = useState(fallbackServices);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
@@ -168,9 +161,32 @@ export default function BookingPage() {
     const requestedServiceId = search.get("service")?.trim() ?? "";
     const requestedProfessionalId = search.get("professional")?.trim() ?? "";
     const requestedDate = search.get("date")?.trim() ?? "";
-    if (buildDateOptions().some(option => option.value === requestedDate)) setDate(requestedDate);
     setRescheduleId(search.get("reschedule")?.trim() ?? "");
     if (requestedProfessionalId) setProfessionalId(requestedProfessionalId);
+
+    void fetch("/api/booking-dates", { cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(result.dates)) {
+          throw new Error("Não foi possível carregar as datas liberadas.");
+        }
+        const nextDates = result.dates.filter(
+          (value: unknown): value is string =>
+            typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value),
+        );
+        if (!active) return;
+        setOpenDates(nextDates);
+        setDatesError("");
+        if (requestedDate && nextDates.includes(requestedDate)) {
+          setDate(requestedDate);
+        }
+      })
+      .catch(() => {
+        if (active) setDatesError("Não foi possível carregar as datas liberadas. Tente novamente em instantes.");
+      })
+      .finally(() => {
+        if (active) setDatesLoading(false);
+      });
 
     void fetch("/api/auth/me", { cache: "no-store" })
       .then(async (response) => {
@@ -509,23 +525,31 @@ export default function BookingPage() {
                 </p>
                 <fieldset className="booking-fieldset">
                   <legend>Datas para agendamento</legend>
-                  <div className="booking-date-grid">
-                    {dateOptions.filter((option, index) => index < 14 || option.value === date).map((option) => (
-                      <button
-                        className={`booking-date-option ${option.value === date ? "selected" : ""}`}
-                        type="button"
-                        key={option.value}
-                        aria-pressed={option.value === date}
-                        onClick={() => {
-                          if (option.value !== date) setTime("");
-                          setDate(option.value);
-                          setError("");
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
+                  {datesLoading ? (
+                    <p className="booking-helper">Carregando as datas liberadas pelo studio…</p>
+                  ) : dateOptions.length ? (
+                    <div className="booking-date-grid">
+                      {dateOptions.map((option) => (
+                        <button
+                          className={`booking-date-option ${option.value === date ? "selected" : ""}`}
+                          type="button"
+                          key={option.value}
+                          aria-pressed={option.value === date}
+                          onClick={() => {
+                            if (option.value !== date) setTime("");
+                            setDate(option.value);
+                            setError("");
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="booking-helper" role="status">
+                      {datesError || "Não há datas liberadas para agendamento no momento."}
+                    </p>
+                  )}
                 </fieldset>
                 {date && (
                   <fieldset className="booking-fieldset">

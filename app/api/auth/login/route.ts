@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { createSession, sessionCookie, verifyPassword } from "../../../../lib/auth";
+import { createSession, hashPassword, passwordNeedsRehash, sessionCookie, verifyPassword, isTrustedMutationRequest } from "../../../../lib/auth";
 import { users } from "../../../../db/schema";
 
 function json(data: Record<string, unknown>, status = 200, cookie?: string) {
@@ -10,6 +10,8 @@ function json(data: Record<string, unknown>, status = 200, cookie?: string) {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) return json({ message: "Origem da solicitação inválida." }, 403);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -21,12 +23,16 @@ export async function POST(request: Request) {
   const values = body as Record<string, unknown>;
   const email = typeof values.email === "string" ? values.email.trim().toLowerCase() : "";
   const password = typeof values.password === "string" ? values.password : "";
-  if (!email || !password) return json({ message: "Informe e-mail e senha." }, 400);
+  if (!email || email.length > 160 || !password || password.length > 128) return json({ message: "Informe e-mail e senha válidos." }, 400);
 
   try {
     const db = await getDb();
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (!user || user.status !== "active" || !(await verifyPassword(password, user.passwordHash))) return json({ message: "E-mail ou senha inválidos." }, 401);
+
+    if (passwordNeedsRehash(user.passwordHash)) {
+      await db.update(users).set({ passwordHash: await hashPassword(password), updatedAt: new Date() }).where(eq(users.id, user.id));
+    }
 
     const session = await createSession(db, user.id);
     return json({ user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role } }, 200, sessionCookie(session.token, request, session.expiresAt));

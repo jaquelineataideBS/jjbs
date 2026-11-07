@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { clients, users } from "../../../../db/schema";
-import { createSession, hashPassword, sessionCookie } from "../../../../lib/auth";
+import { createSession, hashPassword, isTrustedMutationRequest, sessionCookie } from "../../../../lib/auth";
 import { normalizeWhatsapp } from "../../../../lib/masks";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -15,6 +15,8 @@ function json(data: Record<string, unknown>, status = 200, cookie?: string) {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) return json({ message: "Origem da solicitação inválida." }, 403);
+
   let body: Record<string, unknown>;
   try {
     const value: unknown = await request.json();
@@ -29,8 +31,8 @@ export async function POST(request: Request) {
   const phone = normalizeWhatsapp(body.phone);
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || !phone || password.length < 8 || password.length > 128) {
-    return json({ message: "Informe nome, e-mail, WhatsApp e uma senha com pelo menos 8 caracteres." }, 400);
+  if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || !phone || password.length < 12 || password.length > 128) {
+    return json({ message: "Informe nome, e-mail, WhatsApp e uma senha com pelo menos 12 caracteres." }, 400);
   }
 
   try {

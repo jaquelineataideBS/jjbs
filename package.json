@@ -1,15 +1,15 @@
 {
-  "name": "site-creator-vinext-starter",
+  "name": "jaqueline-beauty-studio",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "dev": "node scripts/run-vinext.mjs dev",
     "build": "next build --webpack",
-    "build:preview": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "build:preview": "node scripts/run-vinext.mjs build",
+    "start": "node scripts/run-vinext.mjs start",
     "test": "node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
@@ -23,28 +23,47 @@
     "drizzle-orm": "0.45.2",
     "firebase": "^13.1.0",
     "firebase-admin": "^14.5.0",
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "react-loading-skeleton": "3.5.0"
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/vite-plugin": "1.67.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
+    "@vitejs/plugin-react": "6.2.1",
+    "@vitejs/plugin-rsc": "0.5.39",
+    "drizzle-kit": "0.31.11",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
-    "react-server-dom-webpack": "19.2.6",
+    "eslint-config-next": "16.4.5",
+    "react-server-dom-webpack": "19.3.1",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "vinext": "1.4.4",
+    "vite": "8.3.6",
+    "wrangler": "4.158.0"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.7"
+    },
+    "@google-cloud/firestore-api": {
+      "google-gax": {
+        "google-auth-library": {
+          "gaxios": "7.3.1"
+        },
+        "rimraf": "6.1.4"
+      }
+    },
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    },
+    "fflate": "0.8.3",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    }
   },
   "type": "module"
 }

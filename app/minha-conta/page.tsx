@@ -826,7 +826,8 @@ export default function MyAccountPage() {
                   autoComplete={
                     mode === "login" ? "current-password" : "new-password"
                   }
-                  minLength={8}
+                  minLength={mode === "login" ? undefined : 12}
+                  maxLength={128}
                   required
                 />
               </label>
@@ -845,7 +846,8 @@ export default function MyAccountPage() {
                       updateField("passwordConfirmation", event.target.value)
                     }
                     autoComplete="new-password"
-                    minLength={8}
+                    minLength={12}
+                    maxLength={128}
                     required
                   />
                 </label>

@@ -50,6 +50,10 @@ export default async function RootLayout({
     sameAs: settings.instagram ? [settings.instagram] : undefined,
     priceRange: "$$",
   };
+  const serializedStructuredData = JSON.stringify(structuredData)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
   return (
     <html lang="pt-BR">
       <body>
@@ -60,7 +64,7 @@ export default async function RootLayout({
         </PublicSettingsProvider>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: serializedStructuredData }}
         />
       </body>
     </html>

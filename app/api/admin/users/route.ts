@@ -67,8 +67,8 @@ export async function POST(request: Request) {
     const password = typeof body.password === "string" ? body.password : "";
     const role = text(body.role, 20);
     const professionalId = text(body.professionalId, 120);
-    if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || !phone || password.length < 8 || password.length > 128 || !isInternalRole(role)) {
-      return noStore({ message: "Informe nome, e-mail, WhatsApp, cargo e senha com pelo menos 8 caracteres." }, 400);
+    if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || !phone || password.length < 12 || password.length > 128 || !isInternalRole(role)) {
+      return noStore({ message: "Informe nome, e-mail, WhatsApp, cargo e senha com pelo menos 12 caracteres." }, 400);
     }
 
     const db = await getDb();
@@ -111,7 +111,7 @@ export async function PATCH(request: Request) {
     const role = text(body.role, 20);
     const status = text(body.status, 20);
     const professionalId = text(body.professionalId, 120);
-    if (!id || name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || !phone || (password && (password.length < 8 || password.length > 128)) || !isInternalRole(role) || !["active", "inactive"].includes(status)) {
+    if (!id || name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || !phone || (password && (password.length < 12 || password.length > 128)) || !isInternalRole(role) || !["active", "inactive"].includes(status)) {
       return noStore({ message: "Revise nome, e-mail, WhatsApp, cargo, status e senha." }, 400);
     }
     if (id === admin.id && (role !== admin.role || status !== "active")) return noStore({ message: "Você não pode alterar o próprio cargo nem inativar sua conta." }, 409);

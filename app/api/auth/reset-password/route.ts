@@ -1,13 +1,15 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { passwordResetTokens, sessions, users } from "../../../../db/schema";
-import { hashPassword, hashToken } from "../../../../lib/auth";
+import { hashPassword, hashToken, isTrustedMutationRequest } from "../../../../lib/auth";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) return Response.json({ message: "Link ou senha inválidos." }, { status: 403, headers: { "Cache-Control": "no-store" } });
+
   let body: Record<string, unknown>;
   try {
     const value: unknown = await request.json();
@@ -19,8 +21,8 @@ export async function POST(request: Request) {
 
   const token = typeof body.token === "string" ? body.token : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (token.length < 32 || password.length < 8 || password.length > 128) {
-    return Response.json({ message: "Use uma senha com pelo menos 8 caracteres." }, { status: 400 });
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token) || password.length < 12 || password.length > 128) {
+    return Response.json({ message: "Use um link válido e uma senha com pelo menos 12 caracteres." }, { status: 400 });
   }
 
   try {
