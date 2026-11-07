@@ -13,11 +13,23 @@ export async function getDatabaseUrl() {
   return localDatabaseUrl();
 }
 
+function createDb(databaseUrl: string) {
+  return drizzle(neon(databaseUrl), { schema });
+}
+
+let cachedDatabaseUrl: string | undefined;
+let cachedDatabase: ReturnType<typeof createDb> | undefined;
+
 export async function getDb() {
   const databaseUrl = await getDatabaseUrl();
   if (!databaseUrl) {
     throw new Error("Neon DATABASE_URL is unavailable. Configure DATABASE_URL in the runtime environment before using the database.");
   }
 
-  return drizzle(neon(databaseUrl), { schema });
+  if (!cachedDatabase || cachedDatabaseUrl !== databaseUrl) {
+    cachedDatabaseUrl = databaseUrl;
+    cachedDatabase = createDb(databaseUrl);
+  }
+
+  return cachedDatabase;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cache, Suspense } from "react";
 import type { CSSProperties } from "react";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../db";
@@ -11,7 +12,7 @@ import "./home.css";
 
 export const dynamic = "force-dynamic";
 
-async function getHighlights() {
+const getHighlights = cache(async function getHighlights() {
   try {
     const db = await getDb();
     const [serviceRows, workRows] = await Promise.all([
@@ -24,10 +25,55 @@ async function getHighlights() {
   } catch {
     return { serviceRows: [], workRows: [] };
   }
+});
+
+function HomeScheduleLoading() {
+  return (
+    <section className="home-section home-schedule" aria-busy="true">
+      <div className="home-section-top">
+        <h2>Dias disponíveis.</h2>
+        <a className="home-link" href="/agendar">Consultar horários ↗</a>
+      </div>
+      <p>Consultando a agenda do studio…</p>
+    </section>
+  );
+}
+
+function HomeServicesLoading() {
+  return (
+    <section className="home-services home-section" aria-busy="true">
+      <div className="home-section-top">
+        <h2>O seu próximo cuidado.</h2>
+        <a className="home-link" href="/servicos">Todos os serviços ↗</a>
+      </div>
+      <p>Carregando serviços…</p>
+    </section>
+  );
+}
+
+async function HomeServices() {
+  const { serviceRows } = await getHighlights();
+  return (
+    <section className="home-services home-section" aria-labelledby="services-title">
+      <div className="home-section-top"><h2 id="services-title">O seu próximo cuidado.</h2><a className="home-link" href="/servicos">Todos os serviços ↗</a></div>
+      {serviceRows.length ? <div className="home-service-list">{serviceRows.map(service => <a href="/agendar" key={service.id} className="home-service"><h3>{service.name}</h3><p>{service.description}</p><div><span>{service.duration >= 60 ? `${Math.floor(service.duration / 60)}h${service.duration % 60 ? String(service.duration % 60).padStart(2, "0") : ""}` : `${service.duration} min`}</span><strong>{service.price === null ? "Sob consulta" : `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.price / 100)}`}</strong></div><span className="home-service-arrow" aria-hidden="true">↗</span></a>)}</div> : <div className="home-service-empty"><p>Uma mudança de visual ou um momento de cuidado? Conheça os serviços e escolha o atendimento para você.</p><a className="home-button" href="/servicos">Explorar serviços ↗</a></div>}
+    </section>
+  );
+}
+
+async function HomeWork() {
+  const { workRows } = await getHighlights();
+  if (!workRows.length) return null;
+  return (
+    <section className="home-work home-section" aria-labelledby="work-title">
+      <div className="home-section-top"><h2 id="work-title">Nossa assinatura.</h2><a className="home-link" href="/trabalhos">Ver todos os trabalhos ↗</a></div>
+      <div className={`home-work-grid${workRows.length < 3 ? " home-work-pair" : ""}`}>{workRows.map(work => <a href="/trabalhos" key={work.id}><figure><img src={work.image} alt={work.title || work.category || "Trabalho realizado no studio"} loading="lazy" /><figcaption><span>{work.title || work.category || "Conheça este resultado"}</span><span aria-hidden="true">↗</span></figcaption></figure>{work.title && work.category && work.title !== work.category && <p>{work.category}</p>}</a>)}</div>
+    </section>
+  );
 }
 
 export default async function Home() {
-  const [settings, { serviceRows, workRows }] = await Promise.all([getPublicSettings(), getHighlights()]);
+  const settings = await getPublicSettings();
   const name = settings.salonName.replace(/Beauty Studio$/i, "").trim();
   const portrait = settings.bannerImageUrl || "/jaqueline-justino-hero.png";
   const whatsapp = whatsappHref(settings.whatsapp);
@@ -56,16 +102,13 @@ export default async function Home() {
         </div>
         <figure className="home-portrait"><img src={portrait} alt={`${name} no Beauty Studio`} fetchPriority="high" /></figure>
       </section>
-      <HomeSchedule />
-      <section className="home-services home-section" aria-labelledby="services-title">
-        <div className="home-section-top"><h2 id="services-title">O seu próximo cuidado.</h2><a className="home-link" href="/servicos">Todos os serviços ↗</a></div>
-        {serviceRows.length ? <div className="home-service-list">{serviceRows.map(service => <a href="/agendar" key={service.id} className="home-service"><h3>{service.name}</h3><p>{service.description}</p><div><span>{service.duration >= 60 ? `${Math.floor(service.duration / 60)}h${service.duration % 60 ? String(service.duration % 60).padStart(2, "0") : ""}` : `${service.duration} min`}</span><strong>{service.price === null ? "Sob consulta" : `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.price / 100)}`}</strong></div><span className="home-service-arrow" aria-hidden="true">↗</span></a>)}</div> : <div className="home-service-empty"><p>Uma mudança de visual ou um momento de cuidado? Conheça os serviços e escolha o atendimento para você.</p><a className="home-button" href="/servicos">Explorar serviços ↗</a></div>}
-      </section>
+      <Suspense fallback={<HomeScheduleLoading />}><HomeSchedule /></Suspense>
+      <Suspense fallback={<HomeServicesLoading />}><HomeServices /></Suspense>
       <section className="home-about home-section" id="studio" aria-labelledby="studio-title">
         <div className="home-about-name"><img src={settings.logoUrl || "/jaqueline-justino-monogram.png"} alt="" loading="lazy" /><p>Seu estilo merece<br />um cuidado próprio.</p></div>
         <div><h2 id="studio-title">Antes do espelho,<br />uma conversa.</h2><p>O que você quer mudar? O que quer manter? Seu atendimento começa com espaço para falar sobre o seu cabelo, seu estilo e a sua rotina.</p><p>Da escolha do serviço ao acabamento, um cuidado pensado para acompanhar você também fora do studio.</p><a className="home-link" href={whatsapp}>Converse com o studio ↗</a></div>
       </section>
-      {workRows.length > 0 && <section className="home-work home-section" aria-labelledby="work-title"><div className="home-section-top"><h2 id="work-title">Nossa assinatura.</h2><a className="home-link" href="/trabalhos">Ver todos os trabalhos ↗</a></div><div className={`home-work-grid${workRows.length < 3 ? " home-work-pair" : ""}`}>{workRows.map(work => <a href="/trabalhos" key={work.id}><figure><img src={work.image} alt={work.title || work.category || "Trabalho realizado no studio"} loading="lazy" /><figcaption><span>{work.title || work.category || "Conheça este resultado"}</span><span aria-hidden="true">↗</span></figcaption></figure>{work.title && work.category && work.title !== work.category && <p>{work.category}</p>}</a>)}</div></section>}
+      <Suspense fallback={null}><HomeWork /></Suspense>
       <section className="home-booking home-section" aria-labelledby="booking-title"><div><h2 id="booking-title">Reserve um tempo<br />para você.</h2><p>Escolha seu serviço, consulte os horários e faça seu agendamento pelo app.</p></div><div><a className="home-button" href="/agendar">Escolher meu horário ↗</a><a className="home-secondary" href="/lista-de-espera">Não encontrou horário? Entre na lista de espera ↗</a></div></section>
       <section className="home-faq home-section" aria-labelledby="faq-title">
         <div><h2 id="faq-title">Pode chegar<br />sem dúvidas.</h2><p>O essencial para planejar a sua visita com tranquilidade.</p><a className="home-link" href={whatsapp}>Tire uma dúvida pelo WhatsApp ↗</a></div>

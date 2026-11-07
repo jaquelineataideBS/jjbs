@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { salonSettings } from "../db/schema";
@@ -42,7 +43,7 @@ export const defaultPublicSettings: PublicSettings = {
   accentColor: "#D4AF37",
 };
 
-export async function getPublicSettings(): Promise<PublicSettings> {
+export const getPublicSettings = cache(async function getPublicSettings(): Promise<PublicSettings> {
   try {
     const db = await getDb();
     const [settings] = await db
@@ -71,4 +72,4 @@ export async function getPublicSettings(): Promise<PublicSettings> {
   } catch {
     return defaultPublicSettings;
   }
-}
+});

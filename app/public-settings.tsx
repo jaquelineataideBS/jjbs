@@ -19,7 +19,10 @@ export function PublicSettingsProvider({
   const [settings, setSettings] = useState(initial);
 
   useEffect(() => {
-    const refresh = () =>
+    let refreshedAt = Date.now();
+    const refresh = (force = false) => {
+      if (!force && Date.now() - refreshedAt < 30_000) return;
+      refreshedAt = Date.now();
       void fetch("/api/settings", { cache: "no-store" })
         .then(async (response) => (response.ok ? response.json() : null))
         .then((payload) => {
@@ -27,14 +30,16 @@ export function PublicSettingsProvider({
             setSettings((current) => ({ ...current, ...payload.settings }));
         })
         .catch(() => undefined);
-    refresh();
+    };
+    const refreshOnFocus = () => refresh();
+    const refreshAfterStudioUpdate = () => refresh(true);
     const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
-    window.addEventListener("focus", refresh);
-    window.addEventListener("studio-settings-updated", refresh);
+    window.addEventListener("focus", refreshOnFocus);
+    window.addEventListener("studio-settings-updated", refreshAfterStudioUpdate);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("studio-settings-updated", refresh);
+      window.removeEventListener("focus", refreshOnFocus);
+      window.removeEventListener("studio-settings-updated", refreshAfterStudioUpdate);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
