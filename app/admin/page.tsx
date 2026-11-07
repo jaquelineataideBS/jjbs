@@ -247,6 +247,7 @@ export default function AdminPage() {
   >("agenda");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [serviceForm, setServiceForm] = useState<ServiceForm>(emptyService);
@@ -285,6 +286,23 @@ export default function AdminPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+  async function logout() {
+    setLoggingOut(true);
+    setMessage("");
+    setError(false);
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Não foi possível encerrar a sessão.");
+      window.location.replace("/minha-conta");
+    } catch (cause) {
+      setError(true);
+      setMessage(cause instanceof Error ? cause.message : "Não foi possível encerrar a sessão.");
+      setLoggingOut(false);
     }
   }
   async function loadSchedule() {
@@ -624,6 +642,15 @@ export default function AdminPage() {
           >
             <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
             {theme === "dark" ? "Claro" : "Escuro"}
+          </button>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => void logout()}
+            disabled={loggingOut}
+            aria-label="Sair da conta administrativa"
+          >
+            {loggingOut ? "Saindo..." : "Sair da conta"}
           </button>
         </div>
       </header>
