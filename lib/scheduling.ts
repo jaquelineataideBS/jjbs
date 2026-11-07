@@ -32,6 +32,25 @@ export function todayInFortaleza() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Fortaleza" }).format(new Date());
 }
 
+export function buildDailyStartSlots(periods: { startTime: string; endTime: string; breakStart: string | null; breakEnd: string | null }[], durationMinutes: number, unavailable: TimeRange[]) {
+  const hours = [...periods].sort((first, second) => first.startTime.localeCompare(second.startTime))[0];
+  if (!hours) return [];
+  if (durationMinutes <= 0) return [];
+  if (timeToMinutes(hours.startTime) + durationMinutes > timeToMinutes(hours.endTime)) return [];
+
+  const range = {
+    startTime: hours.startTime,
+    endTime: addMinutes(hours.startTime, durationMinutes),
+  };
+  const breakRange = hours.breakStart && hours.breakEnd ? { startTime: hours.breakStart, endTime: hours.breakEnd } : null;
+
+  if (range.endTime > hours.endTime) return [];
+  if (breakRange && rangesOverlap(range, breakRange)) return [];
+  if (unavailable.some((item) => rangesOverlap(range, item))) return [];
+
+  return [hours.startTime];
+}
+
 export function buildAvailableSlots(hours: { startTime: string; endTime: string; breakStart: string | null; breakEnd: string | null }, durationMinutes: number, unavailable: TimeRange[]) {
   const slots: string[] = [];
   const workRange = { startTime: hours.startTime, endTime: hours.endTime };

@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, notInArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { appointments, blockedTimes, businessHours, openScheduleDates, professionals, professionalServices, services } from "../db/schema";
-import { buildAvailableSlots, todayInFortaleza, weekdayForDate } from "./scheduling";
+import { buildDailyStartSlots, todayInFortaleza, weekdayForDate } from "./scheduling";
 
 export function upcomingDates(today: string, count = 14) {
   return Array.from({ length: count }, (_, offset) => {
@@ -32,13 +32,18 @@ export async function getPublicSchedule() {
     const openSet = new Set(openDates.map(row => `${row.professionalId}:${row.date}`));
     const now = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Fortaleza", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
     const unavailable = [...blocks, ...bookings];
-    return { days: dates.filter(date => hours.some(period => {
-      if (period.weekday !== weekdayForDate(date) || !openSet.has(`${period.professionalId}:${date}`)) return false;
-      const durations = relations.filter(row => row.professionalId === period.professionalId && row.duration > 0).map(row => row.duration);
-      if (!durations.length) return false;
-      return buildAvailableSlots(period, Math.min(...durations), unavailable.filter(row => row.date === date && row.professionalId === period.professionalId))
-        .some(slot => date !== today || slot > now);
-    })), failed: false };
+    return { days: dates.filter(date => {
+      const professionalsForDate = [...new Set(hours
+        .filter(period => period.weekday === weekdayForDate(date) && openSet.has(`${period.professionalId}:${date}`))
+        .map(period => period.professionalId))];
+      return professionalsForDate.some(professionalId => {
+        const durations = relations.filter(row => row.professionalId === professionalId && row.duration > 0).map(row => row.duration);
+        if (!durations.length) return false;
+        const periods = hours.filter(period => period.professionalId === professionalId && period.weekday === weekdayForDate(date));
+        return buildDailyStartSlots(periods, Math.min(...durations), unavailable.filter(row => row.date === date && row.professionalId === professionalId))
+          .some(slot => date !== today || slot > now);
+      });
+    }), failed: false };
   } catch {
     return { days: [], failed: true };
   }

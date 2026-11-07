@@ -1,7 +1,7 @@
 import { and, asc, eq, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { appointments, blockedTimes, businessHours, openScheduleDates, professionalServices, professionals, services } from "../../../db/schema";
-import { buildAvailableSlots, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
+import { buildDailyStartSlots, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
 
 const cancelledStatuses = ["cancelled_by_client", "cancelled_by_salon"];
 
@@ -52,11 +52,13 @@ export async function GET(request: Request) {
           ...blockRows.filter((row) => row.professionalId === pair.professionalId),
           ...appointmentRows.filter((row) => row.professionalId === pair.professionalId),
         ];
-        for (const period of hours.filter((row) => row.professionalId === pair.professionalId)) {
-          for (const slot of buildAvailableSlots(period, pair.durationMinutes, unavailable)) slots.add(slot);
-        }
+        for (const slot of buildDailyStartSlots(
+          hours.filter((row) => row.professionalId === pair.professionalId),
+          pair.durationMinutes,
+          unavailable,
+        )) slots.add(slot);
       }
-      return noStore({ professionals: [], slots: [...slots].sort() });
+      return noStore({ professionals: [], slots: [...slots].sort().slice(0, 1) });
     }
 
     const [service] = await db.select({ id: services.id, durationMinutes: services.durationMinutes })
@@ -90,7 +92,7 @@ export async function GET(request: Request) {
     ]);
 
     const unavailable = [...blockRows, ...appointmentRows];
-    const slots = [...new Set(hours.flatMap((period) => buildAvailableSlots(period, service.durationMinutes, unavailable)))].sort();
+    const slots = buildDailyStartSlots(hours, service.durationMinutes, unavailable);
     return noStore({ professionals: availableProfessionals, slots });
   } catch {
     return noStore({ message: "A agenda ainda não está configurada neste ambiente." }, 503);
