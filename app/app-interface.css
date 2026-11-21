@@ -34,7 +34,7 @@
 .admin-page :is(.admin-panel-heading h2,.settings-module>.admin-panel-heading h2){font-size:30px;line-height:1.15;letter-spacing:-.035em;margin-top:8px}
 .admin-page :is(.admin-panel-heading>p,.admin-service-list p,.admin-client-identity p,.admin-portfolio-list p,.finance-transaction-list p,.marketing-list p,.communication-history p,.review-list p,.users-list p){font-size:14px;line-height:1.65;color:var(--ui-muted)}
 .admin-page .admin-panel-heading>p{max-width:280px}
-.admin-page :is(.text-button,.admin-client-delete,.category-delete,.portfolio-remove-image){min-height:44px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;padding:10px 14px;border-radius:10px;letter-spacing:normal;text-transform:none;line-height:1.35}
+.admin-page :is(.text-button,.admin-client-delete,.category-delete,.portfolio-delete-button,.portfolio-remove-image){min-height:44px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;padding:10px 14px;border-radius:10px;letter-spacing:normal;text-transform:none;line-height:1.35}
 .admin-page .text-button{color:var(--gold);background:color-mix(in srgb,var(--gold) 9%,transparent)}
 .admin-page .text-button:hover{background:color-mix(in srgb,var(--gold) 17%,transparent)}
 .admin-page .admin-theme-toggle{font-size:13px;letter-spacing:normal;text-transform:none;min-height:44px;border-radius:10px}
@@ -98,6 +98,8 @@
 .open-date-services{display:grid;gap:14px;max-width:480px}
 .open-date-services fieldset{display:grid;gap:14px;margin:0;padding:18px;border:1px solid var(--ui-border,#777);border-radius:12px}
 .open-date-services legend{padding:0 6px;font-weight:600}
+.open-date-service-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.open-date-service-actions button{min-height:44px;padding:8px 12px;border:1px solid var(--ui-border,#777);border-radius:10px;background:transparent;color:inherit;cursor:pointer;font:inherit}
 .open-date-service-list{display:grid;gap:4px}
 .open-date-service{display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer}
 .open-date-service input{width:20px;height:20px;accent-color:#d4af37}
@@ -112,3 +114,18 @@
 .account-review-stars button[aria-pressed=true]{background:color-mix(in srgb,#d4af37 16%,transparent);border-color:#d4af37}
 .account-review-stars button:focus-visible{outline:3px solid #d4af37;outline-offset:2px}
 .account-review-card form>label span,.account-review-card form small{color:var(--ui-muted,#5e5c53);font-size:13px}
+
+.booking-page .booking-hair-size-picker{align-items:center;display:grid;gap:20px;grid-template-columns:minmax(130px,.7fr) minmax(0,1fr);max-width:680px}
+.booking-page .booking-hair-size-photo{aspect-ratio:941/1672;margin:0;position:relative;width:100%}
+.booking-page .booking-hair-size-photo img{display:block;height:auto;object-fit:contain;object-position:center;width:100%}
+.booking-page .booking-hair-size-photo figcaption{inset:0;position:absolute}
+.booking-page .booking-hair-size-grid{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.booking-page .booking-hair-size-grid .booking-date-option{align-items:center;display:flex;justify-content:center;min-height:84px}
+.booking-page .booking-hair-size-grid .booking-date-option strong{font-family:'Playfair Display',Georgia,serif;font-size:30px;font-weight:500}
+@media(max-width:520px){.booking-page .booking-hair-size-picker{gap:12px;grid-template-columns:minmax(92px,.65fr) minmax(0,1fr)}.booking-page .booking-hair-size-grid{gap:8px}.booking-page .booking-hair-size-grid .booking-date-option{min-height:72px}.booking-page .booking-hair-size-grid .booking-date-option strong{font-size:25px}}
+.admin-page .admin-size-prices .admin-form-grid label{align-items:stretch;flex-direction:column;gap:8px}
+.admin-page .admin-size-prices .admin-form-grid input{accent-color:auto;height:auto;min-height:42px;padding:11px 12px;width:100%}
+.admin-page .portfolio-edit-actions,.admin-page .portfolio-list-actions{align-items:center;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.admin-page .portfolio-delete-button{background:transparent;border:1px solid rgba(208,149,135,.45);border-radius:7px;color:#d09587;cursor:pointer;font:inherit;padding:8px 12px}
+.admin-page .portfolio-delete-button:hover{background:rgba(208,149,135,.1);border-color:#d09587}
+.admin-page .portfolio-delete-button:disabled{cursor:not-allowed;opacity:.55}

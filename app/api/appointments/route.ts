@@ -1,13 +1,14 @@
 import { and, eq, gt, inArray, lt, ne, notInArray } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { appointmentServices, appointments, blockedTimes, businessHours, openScheduleDates, professionalServices, clients, notifications, professionals, services, users } from "../../../db/schema";
+import { appointmentServices, appointments, businessHours, openScheduleDates, professionalServices, clients, notifications, professionals, services, users } from "../../../db/schema";
 import { getCurrentUser } from "../../../lib/auth";
 import { normalizeWhatsapp } from "../../../lib/masks";
 import { normalizeCoupon, validateCoupon } from "../../../lib/promotions";
 import { getPublicSettings } from "../../../lib/public-settings";
 import { sendAppointmentPush } from "../../../lib/firebase-push";
 import { internalRoles } from "../../../lib/permissions";
-import { ADMIN_OPEN_REQUIRED_FROM, addMinutes, isClockTime, rangesOverlap, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
+import { addMinutes, buildConfiguredStartSlots, isClockTime, todayInFortaleza, weekdayForDate } from "../../../lib/scheduling";
+import { isHairSize, priceForHairSize, type HairSize } from "../../../lib/hair-sizes";
 
 const blockedStatuses = ["cancelled_by_client", "cancelled_by_salon", "rescheduled"];
 
@@ -16,6 +17,8 @@ type BookingPayload = {
   professionalId: string;
   appointmentDate: string;
   startTime: string;
+  hairSize: HairSize;
+  clientId?: string;
   rescheduleId?: string;
   couponCode?: string;
   client: {
@@ -37,6 +40,8 @@ function parsePayload(value: unknown): BookingPayload | null {
   const professionalId = typeof value.professionalId === "string" ? value.professionalId.trim() : "";
   const appointmentDate = typeof value.appointmentDate === "string" ? value.appointmentDate.trim() : "";
   const startTime = typeof value.startTime === "string" ? value.startTime.trim() : "";
+  const hairSize = value.hairSize;
+  const clientId = typeof value.clientId === "string" ? value.clientId.trim() : "";
   const rescheduleId = typeof value.rescheduleId === "string" ? value.rescheduleId.trim() : "";
   const couponCode = normalizeCoupon(value.couponCode);
   const clientName = typeof value.client.name === "string" ? value.client.name.trim() : "";
@@ -44,7 +49,7 @@ function parsePayload(value: unknown): BookingPayload | null {
   const email = typeof value.client.email === "string" ? value.client.email.trim() : "";
   const notes = typeof value.client.notes === "string" ? value.client.notes.trim() : "";
 
-  if (!serviceId || !professionalId || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || !isClockTime(startTime)) return null;
+  if ((value.clientId !== undefined && typeof value.clientId !== "string") || !serviceId || !professionalId || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || !isClockTime(startTime) || !isHairSize(hairSize)) return null;
   if (clientName.length < 2 || clientName.length > 120 || !phone) return null;
   if (email && (email.length > 160 || !/^\S+@\S+\.\S+$/.test(email))) return null;
   if (notes.length > 500) return null;
@@ -54,6 +59,8 @@ function parsePayload(value: unknown): BookingPayload | null {
     professionalId,
     appointmentDate,
     startTime,
+    hairSize,
+    clientId: clientId || undefined,
     rescheduleId: rescheduleId || undefined,
     couponCode: couponCode || undefined,
     client: { name: clientName, phone, email: email || undefined, notes: notes || undefined },
@@ -81,6 +88,14 @@ export async function POST(request: Request) {
   try {
     const db = await getDb();
     const currentUser = await getCurrentUser(request);
+    if (payload.clientId && payload.rescheduleId) return json({ message: "Selecione o cadastro de cliente antes de iniciar um novo agendamento." }, 400);
+    if (payload.clientId && (!currentUser || !internalRoles.includes(currentUser.role as (typeof internalRoles)[number]))) {
+      return json({ message: "Somente a equipe do studio pode selecionar um cadastro de cliente." }, 403);
+    }
+    const [selectedClient] = payload.clientId
+      ? await db.select({ id: clients.id }).from(clients).where(and(eq(clients.id, payload.clientId), eq(clients.active, true))).limit(1)
+      : [];
+    if (payload.clientId && !selectedClient) return json({ message: "O cadastro selecionado não está mais ativo." }, 404);
     const settings = await getPublicSettings();
     const nowTime = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Fortaleza", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
     const [rescheduledAppointment] = payload.rescheduleId && currentUser
@@ -105,8 +120,12 @@ export async function POST(request: Request) {
       return json({ message: "Este serviço não está disponível para agendamento." }, 400);
     }
 
+    const selectedPriceCents = priceForHairSize(service.sizePrices, payload.hairSize, service.priceCents);
+    if (service.priceType !== "consultation" && selectedPriceCents === null) {
+      return json({ message: `O valor para o tamanho ${payload.hairSize} ainda não foi configurado. Fale com o studio.` }, 409);
+    }
     const appliedPromotion = payload.couponCode
-      ? await validateCoupon(db, payload.couponCode, service.id, service.priceCents)
+      ? await validateCoupon(db, payload.couponCode, service.id, selectedPriceCents)
       : null;
     if (payload.couponCode && !appliedPromotion) {
       return json({ message: "O cupom informado não é mais válido para este serviço." }, 409);
@@ -118,32 +137,22 @@ export async function POST(request: Request) {
     if (!professional) return json({ message: "A profissional escolhida não está ativa." }, 400);
 
     const [openDate] = await db.select({ id: openScheduleDates.id, serviceIds: openScheduleDates.serviceIds }).from(openScheduleDates).where(and(eq(openScheduleDates.professionalId, professional.id), eq(openScheduleDates.date, payload.appointmentDate))).limit(1);
-    if (openDate && (!openDate.serviceIds || !openDate.serviceIds.includes(service.id))) {
-      return json({ message: "Este serviço não está liberado para a data escolhida." }, 409);
-    }
-    if (!openDate && payload.appointmentDate >= ADMIN_OPEN_REQUIRED_FROM) {
+    if (!openDate) {
       return json({ message: "Esta data ainda não foi liberada pela administração." }, 409);
     }
-    if (!openDate) {
-      const [professionalService] = await db.select({ id: professionalServices.id }).from(professionalServices)
-        .where(and(eq(professionalServices.professionalId, professional.id), eq(professionalServices.serviceId, service.id))).limit(1);
-      if (!professionalService) return json({ message: "Este serviço não está liberado para a profissional escolhida." }, 409);
+    if (openDate.serviceIds !== null && !openDate.serviceIds.includes(service.id)) {
+      return json({ message: "Este serviço não está liberado para a data escolhida." }, 409);
     }
+    const [professionalService] = await db.select({ id: professionalServices.id }).from(professionalServices)
+      .where(and(eq(professionalServices.professionalId, professional.id), eq(professionalServices.serviceId, service.id))).limit(1);
+    if (!professionalService) return json({ message: "Este serviço não está liberado para a profissional escolhida." }, 409);
     const endTime = addMinutes(payload.startTime, service.durationMinutes);
+    if (!isClockTime(endTime)) return json({ message: "O atendimento não cabe nesse horário." }, 400);
     const hours = await db.select({ startTime: businessHours.startTime, endTime: businessHours.endTime, breakStart: businessHours.breakStart, breakEnd: businessHours.breakEnd })
       .from(businessHours)
       .where(and(eq(businessHours.professionalId, professional.id), eq(businessHours.weekday, weekdayForDate(payload.appointmentDate)), eq(businessHours.active, true)));
-    const selectedRange = { startTime: payload.startTime, endTime };
-    const insideWorkingPeriod = hours.some((period) =>
-      payload.startTime === period.startTime && endTime <= period.endTime &&
-      !(period.breakStart && period.breakEnd && rangesOverlap(selectedRange, { startTime: period.breakStart, endTime: period.breakEnd })),
-    );
+    const insideWorkingPeriod = buildConfiguredStartSlots(hours, service.durationMinutes, []).includes(payload.startTime);
     if (!insideWorkingPeriod) return json({ message: "O horário escolhido está fora do expediente da profissional." }, 400);
-
-    const blocked = await db.select({ id: blockedTimes.id }).from(blockedTimes).where(and(
-      eq(blockedTimes.professionalId, professional.id), eq(blockedTimes.blockDate, payload.appointmentDate), lt(blockedTimes.startTime, endTime), gt(blockedTimes.endTime, payload.startTime),
-    )).limit(1);
-    if (blocked[0]) return json({ message: "Este horário foi bloqueado pelo studio. Escolha outra opção." }, 409);
 
     const conflictRows = await db.select({ id: appointments.id }).from(appointments).where(and(
       eq(appointments.professionalId, professional.id),
@@ -162,7 +171,7 @@ export async function POST(request: Request) {
     const [linkedClient] = currentUser?.role === "client"
       ? await db.select({ id: clients.id }).from(clients).where(eq(clients.userId, currentUser.id)).limit(1)
       : [];
-    const clientId = rescheduledAppointment?.clientId ?? linkedClient?.id ?? crypto.randomUUID();
+    const clientId = rescheduledAppointment?.clientId ?? linkedClient?.id ?? selectedClient?.id ?? crypto.randomUUID();
     const clientValues = {
       name: payload.client.name,
       phone: payload.client.phone,
@@ -180,7 +189,8 @@ export async function POST(request: Request) {
       startTime: payload.startTime,
       endTime,
       status: "pending_confirmation",
-      totalEstimatedCents: service.priceCents === null ? null : Math.max(0, service.priceCents - (appliedPromotion?.discountCents ?? 0)),
+      hairSize: payload.hairSize,
+      totalEstimatedCents: selectedPriceCents === null ? null : Math.max(0, selectedPriceCents - (appliedPromotion?.discountCents ?? 0)),
       promotionId: appliedPromotion?.id,
       couponCode: appliedPromotion?.couponCode,
       discountCents: appliedPromotion?.discountCents ?? 0,
@@ -191,7 +201,7 @@ export async function POST(request: Request) {
       id: appointmentServiceId,
       appointmentId,
       serviceId: service.id,
-      priceCents: service.priceCents,
+      priceCents: selectedPriceCents,
       durationMinutes: service.durationMinutes,
     };
     const studioUsers = await db.select({ id: users.id }).from(users).where(and(
@@ -235,9 +245,9 @@ export async function POST(request: Request) {
         ...(appointmentNotification ? [appointmentNotification] : []),
         ...(studioNotificationValues.length ? [db.insert(notifications).values(studioNotificationValues)] : []),
       ]);
-    } else if (linkedClient) {
+    } else if (linkedClient || selectedClient) {
       await db.batch([
-        db.update(clients).set(clientValues).where(eq(clients.id, linkedClient.id)),
+        db.update(clients).set(clientValues).where(eq(clients.id, clientId)),
         db.insert(appointments).values(appointmentValues),
         db.insert(appointmentServices).values(appointmentServiceValues),
         ...(appointmentNotification ? [appointmentNotification] : []),

@@ -2,12 +2,11 @@
   "name": "jaqueline-beauty-studio",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": ">=22.13.0"
-  },
+  "engines": { "node": ">=22.13.0" },
   "scripts": {
     "dev": "node scripts/run-vinext.mjs dev",
-    "build": "next build --webpack",
+    "build": "node scripts/build.mjs",
+    "build:next": "next build --webpack",
     "build:preview": "node scripts/run-vinext.mjs build",
     "start": "node scripts/run-vinext.mjs start",
     "test": "node --test tests/*.test.mjs",

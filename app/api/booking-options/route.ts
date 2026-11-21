@@ -13,6 +13,7 @@ export async function GET() {
       durationMinutes: services.durationMinutes,
       priceCents: services.priceCents,
       priceType: services.priceType,
+      sizePrices: services.sizePrices,
     }).from(services)
       .leftJoin(serviceCategories, eq(serviceCategories.id, services.categoryId))
       .where(eq(services.active, true))

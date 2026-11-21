@@ -72,6 +72,15 @@ export default function MarketingManagement() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Falha ao salvar."); } finally { setSaving(false); }
   }
 
+  async function redeemHydration(client: Client) {
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await fetch("/api/admin/marketing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resource: "loyalty-redemption", clientId: client.id }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.message ?? "Não foi possível registrar o resgate.");
+      setFeedback(payload.message); await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Não foi possível registrar o resgate."); } finally { setSaving(false); }
+  }
+
   if (!data && !error) return <div className="admin-loading">Carregando promoções e fidelidade...</div>;
   return <section className="marketing-module">
     <div className="admin-panel-heading"><div><span>Relacionamento</span><h2>Promoções e fidelidade</h2></div><p>Campanhas com período real e benefícios registrados no histórico da cliente.</p></div>
@@ -93,7 +102,7 @@ export default function MarketingManagement() {
         <div className="admin-panel marketing-list"><div className="finance-toolbar"><div><span>Campanhas</span><h3>Promoções cadastradas</h3></div><small>{data.promotions.filter((item) => item.active).length} ativas</small></div>{data.promotions.length ? data.promotions.map((promotion) => <article key={promotion.id} className={promotion.active ? "" : "inactive"}><div><span>{audienceLabels[promotion.audience]} · {promotion.startDate.split("-").reverse().join("/")} a {promotion.endDate.split("-").reverse().join("/")}</span><h4>{promotion.title}</h4><p>{promotion.description}</p>{promotion.couponCode && <code>{promotion.couponCode}</code>}</div><div><strong>{discountLabel(promotion)}</strong><small>{promotion.active ? "Ativa" : "Inativa"}</small><button className="text-button" type="button" onClick={() => edit(promotion)}>Editar</button></div></article>) : <p className="admin-empty-state">Nenhuma promoção cadastrada.</p>}</div>
       </div>
       <section className="loyalty-admin admin-panel"><div className="admin-panel-heading"><div><span>Programa de fidelidade</span><h2>Pontos, carimbos e indicações</h2></div><p>Cada ajuste fica registrado e nunca apaga o histórico anterior.</p></div><form onSubmit={adjustLoyalty}><label>Cliente<select value={clientId} onChange={(event) => setClientId(event.target.value)} required><option value="">Selecione</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name} · {client.loyalty.points} pts · {client.loyalty.stamps} carimbos</option>)}</select></label><label>Motivo<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="service">Atendimento</option><option value="referral">Indicação</option><option value="birthday">Aniversário</option><option value="redemption">Resgate</option><option value="adjustment">Ajuste</option></select></label><label>Pontos<input type="number" value={points} onChange={(event) => setPoints(event.target.value)} /></label><label>Carimbos<input type="number" value={stamps} onChange={(event) => setStamps(event.target.value)} /></label><label>Indicações<input type="number" value={referrals} onChange={(event) => setReferrals(event.target.value)} /></label><label>Descrição<input value={description} onChange={(event) => setDescription(event.target.value)} required /></label><button className="button button-gold" disabled={saving}><span>Registrar benefício</span><b>→</b></button></form>
-        <div className="loyalty-client-list"><input placeholder="Buscar cliente" value={query} onChange={(event) => setQuery(event.target.value)} />{filteredClients.slice(0, 12).map((client) => <article key={client.id}><div><strong>{client.name}</strong><small>{client.phone}</small></div><span>{client.loyalty.points} pts</span><span>{client.loyalty.stamps} carimbos</span><span>{client.loyalty.referrals} indicações</span></article>)}</div>
+        <div className="loyalty-client-list"><input placeholder="Buscar cliente" value={query} onChange={(event) => setQuery(event.target.value)} />{filteredClients.slice(0, 12).map((client) => <article key={client.id}><div><strong>{client.name}</strong><small>{client.phone}</small></div><span>{client.loyalty.points} pts</span><span>{client.loyalty.stamps} carimbos</span><span>{client.loyalty.referrals} indicações</span>{client.loyalty.stamps >= 5 && <button className="text-button" type="button" disabled={saving} onClick={() => void redeemHydration(client)}>Registrar hidratação grátis usada</button>}</article>)}</div>
       </section>
     </>}
   </section>;

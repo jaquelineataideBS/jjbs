@@ -75,6 +75,37 @@ export async function POST(request: Request) {
     const body: unknown = await request.json();
     if (!isRecord(body)) return noStore({ message: "Dados inválidos." }, 400);
     const db = await getDb();
+    if (body.resource === "loyalty-redemption") {
+      const clientId = typeof body.clientId === "string" ? body.clientId : "";
+      if (!clientId) return noStore({ message: "Selecione uma cliente." }, 400);
+      const redemption = await db.execute(sql`
+        WITH available AS (
+          SELECT client_id, stamps AS previous_stamps FROM loyalty_accounts
+          WHERE client_id = ${clientId} AND stamps >= 5
+          FOR UPDATE
+        ), redeemed AS (
+          UPDATE loyalty_accounts AS account SET stamps = 0, updated_at = now()
+          FROM available WHERE account.client_id = available.client_id
+          RETURNING account.client_id, available.previous_stamps
+        ), logged AS (
+          INSERT INTO loyalty_transactions
+            (id, client_id, kind, points_delta, stamps_delta, referrals_delta, description, created_by)
+          SELECT ${crypto.randomUUID()}, client_id, 'redemption', 0, -previous_stamps, 0,
+            'Hidratação grátis utilizada; cartão reiniciado', ${admin.id}
+          FROM redeemed
+          RETURNING client_id
+        ), audited AS (
+          INSERT INTO audit_logs (id, user_id, action, entity, entity_id, metadata)
+          SELECT ${crypto.randomUUID()}, ${admin.id}, 'loyalty.hydration_redeemed', 'client', client_id,
+            ${JSON.stringify({ stampsUsed: 5, reward: "free_hydration" })}::jsonb
+          FROM logged
+          RETURNING entity_id
+        )
+        SELECT client_id FROM logged
+      `);
+      if (!Array.isArray(redemption) || redemption.length === 0) return noStore({ message: "A cliente ainda não tem uma hidratação grátis disponível." }, 409);
+      return noStore({ message: "Hidratação grátis registrada. O cartão voltou a zero carimbos." });
+    }
     if (body.resource === "loyalty") {
       const clientId = typeof body.clientId === "string" ? body.clientId : "";
       const kind = typeof body.kind === "string" ? body.kind : "";

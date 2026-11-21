@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, notInArray } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import {
   appointmentServices,
@@ -21,6 +21,12 @@ const validStatuses = new Set([
   "cancelled",
 ]);
 const receivedStatuses = new Set(["partially_paid", "paid"]);
+const excludedAppointmentStatuses = [
+  "cancelled",
+  "cancelled_by_client",
+  "cancelled_by_salon",
+  "rescheduled",
+];
 
 type PaymentInput = {
   id?: string;
@@ -145,23 +151,48 @@ export async function GET(request: Request) {
         403,
       );
     const db = await getDb();
-    const appointmentRows = await db
-      .select({
-        id: appointments.id,
-        appointmentDate: appointments.appointmentDate,
-        startTime: appointments.startTime,
-        status: appointments.status,
-        totalEstimatedCents: appointments.totalEstimatedCents,
-        clientName: clients.name,
-        professionalName: professionals.name,
-      })
-      .from(appointments)
-      .innerJoin(clients, eq(clients.id, appointments.clientId))
-      .leftJoin(professionals, eq(professionals.id, appointments.professionalId))
-      .where(notInArray(appointments.status, ["cancelled_by_client", "cancelled_by_salon", "rescheduled"]))
-      .orderBy(desc(appointments.appointmentDate), desc(appointments.startTime))
-      .limit(500);
-    const appointmentIds = appointmentRows.map((row) => row.id);
+    const today = localDateKey(new Date());
+    const [appointmentRows, scheduledAppointmentRows] = await Promise.all([
+      db
+        .select({
+          id: appointments.id,
+          appointmentDate: appointments.appointmentDate,
+          startTime: appointments.startTime,
+          status: appointments.status,
+          totalEstimatedCents: appointments.totalEstimatedCents,
+          clientName: clients.name,
+          professionalName: professionals.name,
+        })
+        .from(appointments)
+        .innerJoin(clients, eq(clients.id, appointments.clientId))
+        .leftJoin(professionals, eq(professionals.id, appointments.professionalId))
+        .where(notInArray(appointments.status, excludedAppointmentStatuses))
+        .orderBy(desc(appointments.appointmentDate), desc(appointments.startTime))
+        .limit(500),
+      db
+        .select({
+          id: appointments.id,
+          appointmentDate: appointments.appointmentDate,
+          startTime: appointments.startTime,
+          status: appointments.status,
+          totalEstimatedCents: appointments.totalEstimatedCents,
+          clientName: clients.name,
+          professionalName: professionals.name,
+        })
+        .from(appointments)
+        .innerJoin(clients, eq(clients.id, appointments.clientId))
+        .leftJoin(professionals, eq(professionals.id, appointments.professionalId))
+        .where(and(
+          gte(appointments.appointmentDate, today),
+          notInArray(appointments.status, excludedAppointmentStatuses),
+        ))
+        .orderBy(asc(appointments.appointmentDate), asc(appointments.startTime))
+        .limit(80),
+    ]);
+    const allAppointmentRows = [...new Map(
+      [...appointmentRows, ...scheduledAppointmentRows].map((row) => [row.id, row] as const),
+    ).values()];
+    const appointmentIds = allAppointmentRows.map((row) => row.id);
     const [methodRows, paymentRows, serviceRows] = await Promise.all([
       db.select().from(paymentMethods).orderBy(asc(paymentMethods.displayOrder)),
       appointmentIds.length
@@ -212,8 +243,8 @@ export async function GET(request: Request) {
       paymentsByAppointment.set(payment.appointmentId, rows);
     }
 
-    const appointmentMap = new Map(appointmentRows.map((row) => [row.id, row]));
-    const enrichedAppointments = appointmentRows.map((appointment) => {
+    const appointmentMap = new Map(allAppointmentRows.map((row) => [row.id, row]));
+    const enrichAppointment = (appointment: (typeof allAppointmentRows)[number]) => {
       const rows = paymentsByAppointment.get(appointment.id) ?? [];
       const effective = rows.filter(
         (row) => row.status !== "cancelled" && row.status !== "refunded",
@@ -247,12 +278,13 @@ export async function GET(request: Request) {
               ? "partially_paid"
               : "paid",
       };
-    });
+    };
+    const enrichedAppointments = appointmentRows.map(enrichAppointment);
+    const scheduledAppointments = scheduledAppointmentRows.map(enrichAppointment);
 
     const received = paymentRows.filter(
       (row) => receivedStatuses.has(row.status) && row.paidAt,
     );
-    const today = localDateKey(new Date());
     const weekStart = addDays(today, -6);
     const month = today.slice(0, 7);
     const revenue = (predicate: (dateKey: string) => boolean) =>
@@ -291,7 +323,7 @@ export async function GET(request: Request) {
     });
     return noStore({
       methods: methodRows,
-      appointments: enrichedAppointments,
+      appointments: scheduledAppointments,
       transactions,
       report: {
         todayCents: revenue((key) => key === today),
@@ -332,12 +364,17 @@ export async function POST(request: Request) {
       );
     const db = await getDb();
     const [appointment] = await db
-      .select({ id: appointments.id })
+      .select({ id: appointments.id, status: appointments.status })
       .from(appointments)
       .where(eq(appointments.id, input.appointmentId))
       .limit(1);
     if (!appointment)
       return noStore({ message: "Agendamento não encontrado." }, 404);
+    if (excludedAppointmentStatuses.includes(appointment.status))
+      return noStore(
+        { message: "Não é possível lançar pagamento para um agendamento cancelado ou reagendado." },
+        409,
+      );
     if (input.paymentMethodId) {
       const [method] = await db
         .select({ id: paymentMethods.id })
@@ -416,6 +453,16 @@ export async function PATCH(request: Request) {
       .limit(1);
     if (!current)
       return noStore({ message: "Lançamento não encontrado." }, 404);
+    const [appointment] = await db
+      .select({ status: appointments.status })
+      .from(appointments)
+      .where(eq(appointments.id, current.appointmentId))
+      .limit(1);
+    if (!appointment || excludedAppointmentStatuses.includes(appointment.status))
+      return noStore(
+        { message: "Agendamentos cancelados ou reagendados não recebem lançamentos financeiros." },
+        409,
+      );
     const [updated] = await db.batch([
       db
         .update(payments)

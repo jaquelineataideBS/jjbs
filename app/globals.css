@@ -48,6 +48,17 @@
 @media (max-width: 1050px) { .communication-layout,.reminder-settings { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .reminder-settings form { grid-template-columns: 1fr; }.reminder-rule-list { grid-template-columns: 1fr; } }
 
+.loyalty-stamp-card { display: grid; gap: 8px; grid-template-columns: repeat(5,minmax(0,1fr)); margin: 19px 0 12px; }
+.loyalty-stamp-card span { align-items: center; aspect-ratio: 1; border: 1px solid rgba(198,166,106,.35); border-radius: 50%; color: #81786e; display: flex; font-size: 13px; justify-content: center; }
+.loyalty-stamp-card span.earned { background: rgba(198,166,106,.14); border-color: var(--gold); color: var(--gold); }
+.loyalty-stamp-card span.earned img { height: 70%; object-fit: contain; width: 70%; }
+.loyalty-reward-status { color: #aa9f90; font-size: 10px; line-height: 1.55; margin: 0 0 8px; }
+.push-marketing-consent { cursor: pointer; min-height: 44px; touch-action: manipulation; }
+.booking-existing-client { color: #b4aba0; display: flex; flex-direction: column; font-size: 10px; gap: 9px; margin: 0 0 23px; }
+.booking-existing-client select { background: #0e0e0d; border: 1px solid rgba(255,255,255,.15); border-radius: 3px; color: var(--paper); font: inherit; font-size: 12px; min-height: 45px; outline: 0; padding: 13px 14px; }
+.booking-existing-client select:focus { border-color: var(--gold); }
+.booking-existing-client small { color: #8b8378; font-size: 10px; }
+
 /* Avaliações */
 .reviews-admin { display: grid; gap: 26px; }.reviews-admin-grid { align-items: start; display: grid; gap: 14px; grid-template-columns: minmax(0,1fr); }.reviews-admin-grid:has(aside) { grid-template-columns: minmax(300px,.7fr) minmax(0,1.3fr); }.review-comment { color: #b8ada0; font-family: 'Playfair Display'; font-size: 18px; line-height: 1.5; }.review-list article { align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,.1); display: flex; gap: 20px; justify-content: space-between; padding: 20px 0; }.review-list article span { color: var(--gold); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }.review-list h3 { color: var(--paper); font-family: 'Playfair Display'; font-size: 22px; font-weight: 500; margin: 7px 0; }.review-stars { color: var(--gold); letter-spacing: .12em; }.review-list p { color: #aaa094; font-size: 11px; line-height: 1.65; }.review-list small { color: #7e756b; font-size: 8px; }.account-review-card form { display: grid; gap: 10px; margin-top: 18px; }.account-review-card label { color: #857c71; display: flex; flex-direction: column; font-size: 9px; gap: 6px; }.account-review-card input,.account-review-card select,.account-review-card textarea { background: #0e0e0d; border: 1px solid rgba(255,255,255,.14); color: var(--paper); font: inherit; font-size: 10px; padding: 10px; }.account-review-card textarea { min-height: 80px; resize: vertical; }.reviews-live { position: relative; z-index: 1; }.quote-section > blockquote,.quote-section > p { display: none; }.reviews-live blockquote { margin-left: auto; margin-right: auto; }.home-review-carousel { display: grid; gap: 28px; }.home-review-carousel article+article { border-top: 1px solid rgba(198,166,106,.2); padding-top: 28px; }.home-review-carousel small { color: #8d8479; display: block; font-size: 10px; margin-top: 12px; }
 @media (max-width: 850px) { .reviews-admin-grid:has(aside) { grid-template-columns: 1fr; } }
@@ -146,3 +157,60 @@ img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .public-settings-root { min-height: 100vh; }.settings-logo-preview { background: #111; border: 1px solid var(--line); display: block; height: 96px; margin-top: 12px; object-fit: contain; padding: 10px; width: 96px; }.booking-policy-copy { color: #8f877c; font-size: 10px; line-height: 1.6; margin: 12px 0 0 28px; }
 
 .admin-reschedule-row>td{padding:0 12px 14px!important}.admin-reschedule-panel{--home-accent:var(--gold);--home-paper:var(--paper);background:#11100d;border:1px solid var(--line);padding:20px}.admin-reschedule-heading{align-items:center;display:flex;justify-content:space-between;gap:20px}.admin-reschedule-heading span{color:var(--gold);font-size:9px;letter-spacing:.14em;text-transform:uppercase}.admin-reschedule-heading h3{color:var(--paper);font-size:21px;margin:6px 0 0}.admin-reschedule-panel .home-calendars{margin-top:14px}.admin-reschedule-panel .home-calendar{max-width:420px;padding:18px}.admin-reschedule-panel .home-calendar td{height:42px}.admin-reschedule-times{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.admin-reschedule-times .booking-time-option{background:transparent;border:1px solid rgba(255,255,255,.14);color:var(--paper);cursor:pointer;min-height:42px;min-width:72px}.admin-reschedule-times .booking-time-option:hover{border-color:var(--gold);color:var(--gold)}.admin-reschedule-panel>p{color:#aaa196;font-size:12px;margin:12px 0 0}
+.admin-reschedule-panel .home-calendars { min-width: 0; width: 100%; }
+.admin-reschedule-panel .home-calendar { box-sizing: border-box; min-width: 0; width: 100%; }
+.admin-reschedule-panel .home-calendar table { min-width: 0; table-layout: fixed; width: 100%; }
+.admin-reschedule-panel .home-calendar th { border-bottom: 0; font-size: 12px; font-weight: 400; letter-spacing: normal; padding: 8px 0; text-align: center; text-transform: none; }
+.admin-reschedule-panel .home-calendar td { border: 0; height: 42px; padding: 0; }
+
+.admin-reschedule-service-choice { display: grid; gap: 14px; margin-top: 22px; }
+.admin-reschedule-service-choice h4 { color: var(--paper); font-size: 13px; font-weight: 500; margin: 0; }
+.admin-reschedule-service-choice > p { color: #aaa196; font-size: 12px; margin: 0; }
+.admin-reschedule-confirm { background: var(--gold); border: 0; color: #17130d; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; justify-self: start; margin-top: 4px; min-height: 44px; padding: 12px 18px; }
+.admin-reschedule-confirm:disabled { cursor: not-allowed; opacity: .55; }
+.admin-appointment-edit-trigger { display: block; font-size: 11px; margin-top: 6px; }
+.admin-appointment-edit-form { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
+.admin-appointment-edit-form label { color: var(--paper); display: grid; font-size: 12px; gap: 7px; }
+.admin-appointment-edit-form input, .admin-appointment-edit-form select { background: #171613; border: 1px solid rgba(255,255,255,.16); border-radius: 2px; color: var(--paper); font: inherit; min-height: 42px; padding: 9px 11px; width: 100%; }
+.admin-appointment-edit-form input:focus, .admin-appointment-edit-form select:focus { border-color: var(--gold); outline: 1px solid var(--gold); }
+.admin-appointment-edit-form > p { color: #aaa196; font-size: 12px; grid-column: 1 / -1; margin: 0; }
+.admin-appointment-edit-form > button { grid-column: 1 / -1; }
+@media (max-width: 600px) { .admin-appointment-edit-form { grid-template-columns: 1fr; } .admin-appointment-edit-form > p, .admin-appointment-edit-form > button { grid-column: auto; } }
+
+.admin-appointment-edit-calendar,.admin-appointment-edit-times{display:grid;gap:10px;grid-column:1/-1;min-width:0}
+.admin-professional-actions{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+.admin-professional-actions .admin-professional-delete{color:#e49a8f}
+.admin-professional-actions button:disabled{opacity:.5;cursor:wait}
+.admin-appointment-edit-calendar>strong,.admin-appointment-edit-times>strong{color:var(--paper);font-size:12px;font-weight:500}
+.admin-appointment-edit-calendar>p,.admin-appointment-edit-times>p{color:#aaa196;font-size:12px;margin:0}
+.admin-appointment-edit-calendar .home-calendars{margin:0;width:100%}
+.admin-appointment-edit-calendar .home-calendar{box-sizing:border-box;max-width:420px;min-width:0;padding:16px;width:100%}
+.admin-appointment-edit-calendar .home-calendar table{border-spacing:2px;min-width:0;table-layout:fixed;width:100%}
+.admin-appointment-edit-calendar .home-calendar td{height:42px}
+.admin-page .admin-agenda-table{min-width:760px}
+@media(max-width:640px){
+  .admin-page .admin-table-wrap:has(.admin-agenda-table){overflow:visible}
+  .admin-page .admin-agenda-table{border-collapse:separate;border-spacing:0;min-width:0;width:100%}
+  .admin-page .admin-agenda-table thead{display:none}
+  .admin-page .admin-agenda-table tbody{display:grid;gap:12px}
+  .admin-page .admin-agenda-table tbody tr:not(.admin-reschedule-row){background:#171512;border:1px solid rgba(255,255,255,.12);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;padding:6px}
+  .admin-page .admin-agenda-table tbody tr:not(.admin-reschedule-row)>td{border:0;display:block;min-width:0;overflow-wrap:anywhere;padding:9px 8px}
+  .admin-page .admin-agenda-table tbody tr:not(.admin-reschedule-row)>td::before{color:var(--gold);content:attr(data-label);display:block;font-size:10px;letter-spacing:.04em;margin-bottom:5px}
+  .admin-page .admin-agenda-table tbody tr:not(.admin-reschedule-row)>td:nth-child(5){grid-column:1/-1}
+  .admin-page .admin-agenda-table .admin-status,.admin-page .admin-agenda-table .admin-status select{display:block;max-width:100%;min-width:0;width:100%}
+  .admin-page .admin-agenda-table .admin-reschedule-row{display:block;min-width:0}
+  .admin-page .admin-agenda-table .admin-reschedule-row>td{display:block;padding:0!important;width:100%}
+  .admin-page .admin-reschedule-panel{padding:12px}
+  .admin-page .admin-reschedule-heading{align-items:flex-start;gap:10px}
+  .admin-page .admin-reschedule-heading h3{font-size:18px;line-height:1.25}
+  .admin-page .admin-reschedule-heading>.text-button{flex:0 0 auto}
+  .admin-page .admin-reschedule-panel .home-calendar,.admin-page .admin-appointment-edit-calendar .home-calendar{padding:12px 7px}
+  .admin-page .admin-reschedule-panel .home-calendar table,.admin-page .admin-appointment-edit-calendar .home-calendar table{border-spacing:1px}
+  .admin-page .admin-reschedule-panel .home-calendar th,.admin-page .admin-appointment-edit-calendar .home-calendar th{font-size:10px}
+  .admin-page .admin-reschedule-panel .home-calendar td,.admin-page .admin-appointment-edit-calendar .home-calendar td{height:38px}
+  .admin-page .admin-appointment-edit-calendar .calendar-navigation,.admin-page .admin-reschedule-panel .calendar-navigation{gap:6px}
+  .admin-page .admin-appointment-edit-calendar .calendar-navigation h3,.admin-page .admin-reschedule-panel .calendar-navigation h3{font-size:17px}
+}
+.admin-portfolio-preview video { aspect-ratio: 16 / 9; background: #090909; object-fit: contain; width: 100%; }
+.work-video { margin-top: 18px; }
+.work-video video { aspect-ratio: 16 / 9; background: #090909; object-fit: contain; width: 100%; }

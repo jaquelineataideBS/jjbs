@@ -11,6 +11,7 @@ type WorkItem = {
   description: string;
   category: string;
   mainImageUrl: string;
+  videoUrl: string | null;
   beforeImageUrl: string | null;
   afterImageUrl: string | null;
   featured: boolean;
@@ -160,6 +161,11 @@ export default function WorksPage() {
                     {String(index + 1).padStart(2, "0")}
                   </span>
                 </div>
+                {item.videoUrl && (
+                  <div className="work-video">
+                    <video src={item.videoUrl} controls playsInline preload="metadata" aria-label={`Vídeo do procedimento: ${item.title}`} />
+                  </div>
+                )}
                 {(item.beforeImageUrl || item.afterImageUrl) && (
                   <div className="work-comparison" aria-label={`Fotos do resultado: ${item.title}`}>
                     {item.beforeImageUrl && (

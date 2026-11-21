@@ -16,6 +16,8 @@ import SettingsManagement from "./settings-management";
 import UsersManagement from "./users-management";
 import type { Permission } from "../../lib/permissions";
 import { formatWhatsapp } from "../../lib/masks";
+import { formatDurationInHours } from "../../lib/scheduling";
+import { hairSizes, priceForHairSize, type HairSize, type HairSizePrices } from "../../lib/hair-sizes";
 import { PublicBrand } from "../public-settings";
 import PushNotificationsControl from "../push-notifications-control";
 import OpenDatesCalendar from "./open-dates-calendar";
@@ -27,6 +29,7 @@ type Appointment = {
   serviceId: string | null;
   appointmentDate: string;
   startTime: string;
+  hairSize: HairSize | null;
   endTime: string;
   status: string;
   totalEstimatedCents: number | null;
@@ -51,6 +54,7 @@ type Service = {
   durationMinutes: number;
   priceType: string;
   priceCents: number | null;
+  sizePrices: HairSizePrices;
   active: boolean;
 };
 type Overview = {
@@ -72,9 +76,9 @@ type ServiceForm = {
   categoryId: string;
   name: string;
   description: string;
-  durationMinutes: string;
+  durationHours: string;
   priceType: string;
-  price: string;
+  sizePrices: Record<HairSize, string>;
   active: boolean;
 };
 type Professional = {
@@ -103,19 +107,10 @@ type DayHours = {
   weekday: number;
   periods: WorkPeriod[];
 };
-type Block = {
-  id: string;
-  professionalId: string;
-  blockDate: string;
-  startTime: string;
-  endTime: string;
-  reason: string | null;
-};
 type ScheduleData = {
   professionals: Professional[];
   services: Array<{ id: string; name: string; active: boolean }>;
   hours: Hours[];
-  blocks: Block[];
   relations: Array<{ professionalId: string; serviceId: string }>;
 };
 type ProfessionalForm = {
@@ -126,20 +121,14 @@ type ProfessionalForm = {
   active: boolean;
   serviceIds: string[];
 };
-type BlockForm = {
-  blockDate: string;
-  startTime: string;
-  endTime: string;
-  reason: string;
-};
 
 const emptyService: ServiceForm = {
   categoryId: "",
   name: "",
   description: "",
-  durationMinutes: "60",
+  durationHours: "1",
   priceType: "fixed",
-  price: "",
+  sizePrices: { P: "", M: "", G: "", EX: "" },
   active: true,
 };
 const emptyProfessional: ProfessionalForm = {
@@ -259,18 +248,27 @@ export default function AdminPage() {
   const [selectedProfessionalId, setSelectedProfessionalId] = useState("");
   const [selectedScheduleDate, setSelectedScheduleDate] = useState<string | null>(null);
   const [reschedulingAppointment, setReschedulingAppointment] = useState<Appointment | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [editClientName, setEditClientName] = useState("");
+  const [editClientPhone, setEditClientPhone] = useState("");
+  const [editAppointmentDate, setEditAppointmentDate] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editServiceId, setEditServiceId] = useState("");
+  const [editHairSize, setEditHairSize] = useState<HairSize | "">("");
+  const [editDates, setEditDates] = useState<string[]>([]);
+  const [editSlots, setEditSlots] = useState<string[]>([]);
+  const [editDatesLoading, setEditDatesLoading] = useState(false);
+  const [editSlotsLoading, setEditSlotsLoading] = useState(false);
   const [rescheduleDates, setRescheduleDates] = useState<string[]>([]);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleServices, setRescheduleServices] = useState<Service[]>([]);
+  const [rescheduleServiceId, setRescheduleServiceId] = useState("");
+  const [rescheduleHairSize, setRescheduleHairSize] = useState<HairSize>("P");
+  const [rescheduleServicesLoading, setRescheduleServicesLoading] = useState(false);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [hoursForm, setHoursForm] = useState<DayHours[]>(defaultHours());
-  const [blockForm, setBlockForm] = useState<BlockForm>({
-    blockDate: "",
-    startTime: "09:00",
-    endTime: "10:00",
-    reason: "",
-  });
-
   async function request(url: string, options?: RequestInit) {
     const response = await fetch(url, { cache: "no-store", ...options });
     const result = await response.json().catch(() => ({}));
@@ -353,6 +351,64 @@ export default function AdminPage() {
     setHoursForm(editableHours(configured));
   }, [schedule, selectedProfessionalId]);
 
+  useEffect(() => {
+    if (!editingAppointment || !editServiceId) {
+      setEditDates([]);
+      setEditDatesLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setEditDatesLoading(true);
+    // Use the same dates shown by the public homepage calendar. Slot
+    // availability is still checked against this appointment's service and
+    // professional after the admin selects a day.
+    fetch("/api/booking-dates", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message ?? "Não foi possível carregar os dias disponíveis.");
+        setEditDates(Array.isArray(result.dates) ? result.dates : []);
+      })
+      .catch((cause: unknown) => {
+        if (cause instanceof Error && cause.name !== "AbortError") setEditDates([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEditDatesLoading(false);
+      });
+    return () => controller.abort();
+  }, [editingAppointment?.id, editServiceId]);
+
+  useEffect(() => {
+    if (!editingAppointment || !editServiceId || !editAppointmentDate) {
+      setEditSlots([]);
+      setEditSlotsLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setEditSlotsLoading(true);
+    setEditSlots([]);
+    const query = new URLSearchParams({
+      serviceId: editServiceId,
+      professionalId: editingAppointment.professionalId,
+      date: editAppointmentDate,
+      excludeAppointmentId: editingAppointment.id,
+    });
+    fetch(`/api/availability?${query}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message ?? "Não foi possível consultar os horários.");
+        const nextSlots = Array.isArray(result.slots) ? result.slots as string[] : [];
+        setEditSlots(nextSlots);
+        setEditStartTime((current) => nextSlots.includes(current) ? current : "");
+      })
+      .catch((cause: unknown) => {
+        if (cause instanceof Error && cause.name !== "AbortError") setEditSlots([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEditSlotsLoading(false);
+      });
+    return () => controller.abort();
+  }, [editingAppointment?.id, editServiceId, editAppointmentDate]);
+
   const selectedProfessional =
     schedule?.professionals.find(
       (item) => item.id === selectedProfessionalId,
@@ -364,15 +420,15 @@ export default function AdminPage() {
     setMessage(value);
     setError(isError);
   }
-  async function updateStatus(id: string, status: string, appointmentDate?: string, startTime?: string) {
+  async function updateStatus(id: string, status: string, appointmentDate?: string, startTime?: string, serviceId?: string, hairSize?: HairSize) {
     setSaving(true);
     try {
       await request("/api/admin/appointments", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status, appointmentDate, startTime }),
+        body: JSON.stringify({ id, status, appointmentDate, startTime, serviceId, hairSize }),
       });
-      note(appointmentDate && startTime ? `Agendamento reagendado para ${appointmentDate.split("-").reverse().join("/")}, às ${startTime}.` : "Status atualizado.");
+      note(appointmentDate && startTime ? `Agendamento reagendado para ${appointmentDate.split("-").reverse().join("/")}, às ${startTime}${serviceId ? `, serviço: ${data?.services.find((service) => service.id === serviceId)?.name ?? "atualizado"}` : ""}.` : "Status atualizado.");
       if (appointmentDate && startTime) setReschedulingAppointment(null);
       await load();
     } catch (cause) {
@@ -386,12 +442,67 @@ export default function AdminPage() {
       setSaving(false);
     }
   }
+  function beginEditAppointment(appointment: Appointment) {
+    setReschedulingAppointment(null);
+    setEditingAppointment(appointment);
+    setEditClientName(appointment.clientName);
+    setEditClientPhone(appointment.clientPhone);
+    setEditAppointmentDate(appointment.appointmentDate);
+    setEditStartTime(appointment.startTime);
+    setEditServiceId(appointment.serviceId ?? "");
+    setEditHairSize(appointment.hairSize && hairSizes.includes(appointment.hairSize) ? appointment.hairSize : "");
+  }
+  async function saveAppointmentEdit(event: FormEvent<HTMLFormElement>, appointment: Appointment) {
+    event.preventDefault();
+    const scheduleChanged = editAppointmentDate !== appointment.appointmentDate ||
+      editStartTime !== appointment.startTime ||
+      editServiceId !== (appointment.serviceId ?? "") ||
+      editHairSize !== (appointment.hairSize ?? "");
+    if (scheduleChanged && !editHairSize) {
+      note("Escolha o tamanho do cabelo para atualizar o serviço e o valor.", true);
+      return;
+    }
+    if (scheduleChanged && (!editDates.includes(editAppointmentDate) || !editSlots.includes(editStartTime))) {
+      note("Escolha uma data liberada e um horário disponível para este serviço.", true);
+      return;
+    }
+    setSaving(true);
+    try {
+      await request("/api/admin/appointments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: appointment.id,
+          status: appointment.status,
+          clientName: editClientName,
+          clientPhone: editClientPhone,
+          appointmentDate: editAppointmentDate,
+          startTime: editStartTime,
+          serviceId: editServiceId,
+          hairSize: editHairSize || undefined,
+        }),
+      });
+      setEditingAppointment(null);
+      note("Dados do agendamento atualizados.");
+      await load();
+    } catch (cause) {
+      note(cause instanceof Error ? cause.message : "Não foi possível atualizar os dados do agendamento.", true);
+    } finally {
+      setSaving(false);
+    }
+  }
   async function beginReschedule(appointment: Appointment) {
+    setEditingAppointment(null);
     setReschedulingAppointment(appointment);
     setRescheduleDate("");
     setRescheduleSlots([]);
+    setRescheduleTime("");
+    setRescheduleServices([]);
+    setRescheduleServiceId("");
+    setRescheduleHairSize(appointment.hairSize && hairSizes.includes(appointment.hairSize) ? appointment.hairSize : "P");
     setRescheduleLoading(true);
     try {
+      // Keep this calendar in sync with the homepage's public agenda.
       const result = await request("/api/booking-dates");
       setRescheduleDates(Array.isArray(result.dates) ? result.dates : []);
     } catch (cause) {
@@ -404,10 +515,13 @@ export default function AdminPage() {
   async function loadRescheduleSlots(appointment: Appointment, date: string) {
     setRescheduleDate(date);
     setRescheduleSlots([]);
+    setRescheduleTime("");
+    setRescheduleServices([]);
+    setRescheduleServiceId("");
     if (!appointment.serviceId) return note("Este agendamento não tem serviço associado para verificar os horários.", true);
     setRescheduleLoading(true);
     try {
-      const query = new URLSearchParams({ serviceId: appointment.serviceId, professionalId: appointment.professionalId, date });
+      const query = new URLSearchParams({ serviceId: appointment.serviceId, professionalId: appointment.professionalId, date, excludeAppointmentId: appointment.id });
       const result = await request(`/api/availability?${query}`);
       setRescheduleSlots(Array.isArray(result.slots) ? result.slots : []);
       if (!result.slots?.length) note("Não há horários livres para esta profissional nesse dia.", true);
@@ -417,6 +531,39 @@ export default function AdminPage() {
       setRescheduleLoading(false);
     }
   }
+  async function loadRescheduleServices(appointment: Appointment, date: string, time: string) {
+    setRescheduleTime(time);
+    setRescheduleServiceId("");
+    setRescheduleServices([]);
+    setRescheduleServicesLoading(true);
+    const options = (data?.services ?? []).filter((service) => service.active);
+    try {
+      const available = await Promise.all(options.map(async (service) => {
+        try {
+          const query = new URLSearchParams({
+            serviceId: service.id,
+            professionalId: appointment.professionalId,
+            date,
+            time,
+            excludeAppointmentId: appointment.id,
+          });
+          const response = await fetch(`/api/availability?${query}`, { cache: "no-store" });
+          const result = await response.json().catch(() => ({}));
+          return response.ok &&
+            Array.isArray(result.professionals) &&
+            result.professionals.some((professional: { id?: string }) => professional.id === appointment.professionalId) &&
+            Array.isArray(result.slots) && result.slots.includes(time)
+            ? service
+            : null;
+        } catch {
+          return null;
+        }
+      }));
+      setRescheduleServices(available.filter((service): service is Service => service !== null));
+    } finally {
+      setRescheduleServicesLoading(false);
+    }
+  }
   function editService(service: Service) {
     revealEditor(".admin-service-editor");
     setServiceForm({
@@ -424,10 +571,12 @@ export default function AdminPage() {
       categoryId: service.categoryId ?? "",
       name: service.name,
       description: service.description,
-      durationMinutes: String(service.durationMinutes),
+      durationHours: String(Math.round((service.durationMinutes / 60) * 100) / 100),
       priceType: service.priceType,
-      price:
-        service.priceCents === null ? "" : String(service.priceCents / 100),
+      sizePrices: Object.fromEntries(hairSizes.map((size) => {
+        const price = priceForHairSize(service.sizePrices, size, service.priceCents);
+        return [size, price === null ? "" : String(price / 100)];
+      })) as Record<HairSize, string>,
       active: service.active,
     });
     setTab("services");
@@ -436,10 +585,13 @@ export default function AdminPage() {
     event.preventDefault();
     setSaving(true);
     try {
-      const priceCents =
+      const sizePrices = Object.fromEntries(hairSizes.map((size) => [
+        size,
         serviceForm.priceType === "consultation"
           ? null
-          : Math.round(Number(serviceForm.price.replace(",", ".")) * 100);
+          : Math.round(Number(serviceForm.sizePrices[size].replace(",", ".")) * 100),
+      ])) as Record<HairSize, number | null>;
+      const priceCents = sizePrices.P;
       await request("/api/admin/services", {
         method: serviceForm.id ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -448,9 +600,10 @@ export default function AdminPage() {
           categoryId: serviceForm.categoryId || null,
           name: serviceForm.name,
           description: serviceForm.description,
-          durationMinutes: Number(serviceForm.durationMinutes),
+          durationMinutes: Math.round(Number(serviceForm.durationHours.replace(",", ".")) * 60),
           priceType: serviceForm.priceType,
           priceCents,
+          sizePrices,
           active: serviceForm.active,
         }),
       });
@@ -507,6 +660,28 @@ export default function AdminPage() {
           : "Não foi possível salvar a profissional.",
         true,
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function deleteProfessional(professional: Professional) {
+    const confirmed = window.confirm(
+      `Excluir ${professional.name} da equipe? Se houver agendamentos vinculados, o cadastro ficará inativo para preservar o histórico.`,
+    );
+    if (!confirmed) return;
+    setSaving(true);
+    try {
+      const result = await request("/api/admin/schedule", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "professional", id: professional.id }),
+      });
+      if (professionalForm.id === professional.id) setProfessionalForm(emptyProfessional);
+      if (selectedProfessionalId === professional.id) setSelectedScheduleDate(null);
+      note(result.message ?? "Profissional removida.");
+      await loadSchedule();
+    } catch (cause) {
+      note(cause instanceof Error ? cause.message : "Não foi possível excluir a profissional.", true);
     } finally {
       setSaving(false);
     }
@@ -580,60 +755,6 @@ export default function AdminPage() {
         };
       }),
     );
-  }
-  async function saveBlock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedProfessionalId) return;
-    setSaving(true);
-    try {
-      await request("/api/admin/schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "block",
-          professionalId: selectedProfessionalId,
-          ...blockForm,
-        }),
-      });
-      setBlockForm({
-        blockDate: "",
-        startTime: "09:00",
-        endTime: "10:00",
-        reason: "",
-      });
-      note("Horário bloqueado.");
-      await loadSchedule();
-    } catch (cause) {
-      note(
-        cause instanceof Error
-          ? cause.message
-          : "Não foi possível criar o bloqueio.",
-        true,
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-  async function removeBlock(id: string) {
-    setSaving(true);
-    try {
-      await request("/api/admin/schedule", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      note("Bloqueio removido.");
-      await loadSchedule();
-    } catch (cause) {
-      note(
-        cause instanceof Error
-          ? cause.message
-          : "Não foi possível remover o bloqueio.",
-        true,
-      );
-    } finally {
-      setSaving(false);
-    }
   }
   function toggleService(id: string) {
     setProfessionalForm((current) => ({
@@ -869,7 +990,7 @@ export default function AdminPage() {
                 </div>
                 {agenda.length ? (
                   <div className="admin-table-wrap">
-                    <table>
+                    <table className="admin-agenda-table">
                       <thead>
                         <tr>
                           <th>Data e hora</th>
@@ -883,7 +1004,7 @@ export default function AdminPage() {
                         {agenda.map((appointment) => (
                           <Fragment key={appointment.id}>
                           <tr>
-                            <td>
+                            <td data-label="Data e hora">
                               <strong>
                                 {appointment.appointmentDate
                                   .split("-")
@@ -894,16 +1015,18 @@ export default function AdminPage() {
                                 {appointment.startTime}
                               </small>
                             </td>
-                            <td>
+                            <td data-label="Cliente">
                               <strong>{appointment.clientName}</strong>
                               <small>{appointment.clientPhone}</small>
+                              <button className="text-button admin-appointment-edit-trigger" type="button" disabled={saving} onClick={() => beginEditAppointment(appointment)}>Editar agendamento</button>
                             </td>
-                            <td>
+                            <td data-label="Serviço">
                               {appointment.serviceName ??
                                 "Serviço não identificado"}
+                              {appointment.hairSize && <small>Tamanho {appointment.hairSize}</small>}
                             </td>
-                            <td>{money(appointment.totalEstimatedCents)}</td>
-                            <td>
+                            <td data-label="Valor">{money(appointment.totalEstimatedCents)}</td>
+                            <td data-label="Status">
                               <label className="admin-status">
                                 <span className="sr-only">
                                   Status de {appointment.clientName}
@@ -925,20 +1048,61 @@ export default function AdminPage() {
                               </label>
                             </td>
                           </tr>
+                          {editingAppointment?.id === appointment.id && (
+                            <tr className="admin-reschedule-row">
+                              <td colSpan={5}>
+                                <section className="admin-reschedule-panel">
+                                  <div className="admin-reschedule-heading">
+                                    <div><span>Editar agendamento</span><h3>Atualize os dados do cliente e do atendimento</h3></div>
+                                    <button className="text-button" type="button" onClick={() => setEditingAppointment(null)}>Cancelar</button>
+                                  </div>
+                                  <form className="admin-appointment-edit-form" onSubmit={(event) => void saveAppointmentEdit(event, appointment)}>
+                                    <label>Nome do cliente<input autoComplete="name" maxLength={120} required value={editClientName} onChange={(event) => setEditClientName(event.target.value)} /></label>
+                                    <label>WhatsApp<input autoComplete="tel" inputMode="tel" maxLength={20} required value={editClientPhone} onChange={(event) => setEditClientPhone(formatWhatsapp(event.target.value))} /></label>
+                                    <label>Serviço<select required value={editServiceId} onChange={(event) => { setEditServiceId(event.target.value); setEditStartTime(""); }}>
+                                      <option value="">Escolha um serviço</option>
+                                      {data?.services.filter((service) => service.active || service.id === appointment.serviceId).map((service) => <option key={service.id} value={service.id}>{service.name} · preço por tamanho</option>)}
+                                    </select></label>
+                                    <label>Tamanho do cabelo<select value={editHairSize} onChange={(event) => setEditHairSize(event.target.value as HairSize | "")}>{!editHairSize && <option value="">Tamanho não registrado</option>}{hairSizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+                                    <div className="admin-appointment-edit-calendar">
+                                      <strong>Escolha uma data liberada</strong>
+                                      {editDatesLoading ? <p>Carregando datas configuradas…</p> : editDates.length ? <CalendarMonths days={editDates} today={data?.today ?? ""} selectedDate={editAppointmentDate} onSelectDate={(date) => { setEditAppointmentDate(date); setEditStartTime(""); }} /> : <p>Não há datas futuras liberadas para este serviço e profissional.</p>}
+                                    </div>
+                                    <div className="admin-appointment-edit-times">
+                                      <strong>Horários de início</strong>
+                                      {editSlotsLoading ? <p>Consultando horários…</p> : editAppointmentDate && editDates.includes(editAppointmentDate) ? editSlots.length ? <div className="admin-reschedule-times">{editSlots.map((slot) => <button className={`booking-time-option ${slot === editStartTime ? "selected" : ""}`} type="button" key={slot} aria-pressed={slot === editStartTime} onClick={() => setEditStartTime(slot)}>{slot}</button>)}</div> : <p>Não há horários livres nessa data.</p> : <p>Selecione uma data marcada em amarelo.</p>}
+                                    </div>
+                                    <p>As datas amarelas e os horários seguem as liberações da administração para esta profissional e serviço.</p>
+                                    <button className="admin-reschedule-confirm" type="submit" disabled={saving || !editServiceId || (Boolean(editingAppointment && (editAppointmentDate !== appointment.appointmentDate || editStartTime !== appointment.startTime || editServiceId !== (appointment.serviceId ?? "") || editHairSize !== (appointment.hairSize ?? ""))) && (!editHairSize || editDatesLoading || editSlotsLoading || !editDates.includes(editAppointmentDate) || !editSlots.includes(editStartTime)))}>{saving ? "Salvando…" : "Salvar alterações"}</button>
+                                  </form>
+                                </section>
+                              </td>
+                            </tr>
+                          )}
                           {reschedulingAppointment?.id === appointment.id && (
                             <tr className="admin-reschedule-row">
                               <td colSpan={5}>
                                 <section className="admin-reschedule-panel">
                                   <div className="admin-reschedule-heading">
-                                    <div><span>Reagendar</span><h3>Escolha o novo dia e horário</h3></div>
+                                    <div><span>Reagendar</span><h3>Escolha dia, horário e serviço</h3></div>
                                     <button className="text-button" type="button" onClick={() => setReschedulingAppointment(null)}>Cancelar</button>
                                   </div>
                                   {rescheduleLoading && !rescheduleDates.length ? <p>Carregando agenda…</p> : rescheduleDates.length ? (
                                     <CalendarMonths days={rescheduleDates} today={data?.today ?? ""} selectedDate={rescheduleDate} onSelectDate={(date) => void loadRescheduleSlots(appointment, date)} />
                                   ) : <p>Não há dias disponíveis para reagendamento.</p>}
                                   {rescheduleLoading && rescheduleDate && <p>Consultando horários…</p>}
+                                  <label>Tamanho do cabelo<select required value={rescheduleHairSize} onChange={(event) => setRescheduleHairSize(event.target.value as HairSize)}>{hairSizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
                                   {rescheduleDate && !rescheduleLoading && <div className="admin-reschedule-times" aria-label="Horários disponíveis">
-                                    {rescheduleSlots.length ? rescheduleSlots.map((slot) => <button className={`booking-time-option ${slot === appointment.startTime ? "selected" : ""}`} type="button" key={slot} onClick={() => void updateStatus(appointment.id, appointment.status, rescheduleDate, slot)}>{slot}</button>) : <p>Não há horários livres para esta profissional nesse dia.</p>}
+                                    {rescheduleSlots.length ? rescheduleSlots.map((slot) => <button className={`booking-time-option ${slot === rescheduleTime ? "selected" : ""}`} type="button" key={slot} onClick={() => void loadRescheduleServices(appointment, rescheduleDate, slot)}>{slot}</button>) : <p>Não há horários livres para esta profissional nesse dia.</p>}
+                                  </div>}
+                                  {rescheduleTime && <div className="admin-reschedule-service-choice">
+                                    <h4>Serviços disponíveis às {rescheduleTime}</h4>
+                                    {rescheduleServicesLoading ? <p>Consultando serviços para este horário…</p> : rescheduleServices.length ? <div className="booking-service-grid">
+                                      {rescheduleServices.map((service) => <button className={`booking-service-option ${service.id === rescheduleServiceId ? "selected" : ""}`} type="button" key={service.id} aria-pressed={service.id === rescheduleServiceId} onClick={() => setRescheduleServiceId(service.id)}>
+                                        <small>{service.categoryName ?? "Serviço"}</small><strong>{service.name}</strong><span>{formatDurationInHours(service.durationMinutes)} · {service.priceType === "consultation" ? "Sob consulta" : `${rescheduleHairSize}: ${money(priceForHairSize(service.sizePrices, rescheduleHairSize, service.priceCents))}`}</span>
+                                      </button>)}
+                                    </div> : <p>Nenhum serviço disponível para esta profissional nesse horário.</p>}
+                                    <button className="admin-reschedule-confirm" type="button" disabled={saving || rescheduleServicesLoading || !rescheduleServiceId || !rescheduleHairSize} onClick={() => void updateStatus(appointment.id, appointment.status, rescheduleDate, rescheduleTime, rescheduleServiceId, rescheduleHairSize)}>Confirmar reagendamento</button>
                                   </div>}
                                 </section>
                               </td>
@@ -1104,13 +1268,24 @@ export default function AdminPage() {
                               {professional.active ? "ativa" : "inativa"}
                             </small>
                           </button>
-                          <button
-                            className="text-button"
-                            type="button"
-                            onClick={() => editProfessional(professional)}
-                          >
-                            Editar
-                          </button>
+                          <div className="admin-professional-actions">
+                            <button
+                              className="text-button"
+                              type="button"
+                              disabled={saving}
+                              onClick={() => editProfessional(professional)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              className="text-button admin-professional-delete"
+                              type="button"
+                              disabled={saving}
+                              onClick={() => void deleteProfessional(professional)}
+                            >
+                              Excluir
+                            </button>
+                          </div>
                         </article>
                       ))}
                     </div>
@@ -1131,9 +1306,7 @@ export default function AdminPage() {
                             </h2>
                           </div>
                           <p>
-                            Estes horários se aplicam às datas liberadas no mesmo dia da semana. Escreva a entrada e a saída. Ao completar um
-                            período, outro campo aparece para você acrescentar
-                            mais um horário.
+                            Estes horários se aplicam às datas liberadas no mesmo dia da semana. Informe apenas o início de cada período; o intervalo até o próximo horário será calculado automaticamente.
                           </p>
                         </div>
                         <div className="admin-hours-list">
@@ -1193,7 +1366,7 @@ export default function AdminPage() {
                                   </div>
                                 ))}
                               </div>
-                              <p>Informe os horários de início dos atendimentos. Um novo campo aparece após cada horário.</p>
+                              <p>Adicione outro horário de início para abrir um novo período. O sistema calcula os horários disponíveis entre um início e o próximo.</p>
                             </section>
                           ))}
                         </div>
@@ -1205,124 +1378,7 @@ export default function AdminPage() {
                           Salvar expediente <span>↗</span>
                         </button>
                       </form>}
-                      <section className="admin-schedule-blocks">
-                        <form
-                          className="admin-service-form"
-                          onSubmit={saveBlock}
-                        >
-                          <div className="admin-panel-heading">
-                            <div>
-                              <span>Bloqueio pontual</span>
-                              <h2>Fechar um horário</h2>
-                            </div>
-                          </div>
-                          <div className="admin-form-grid">
-                            <label>
-                              Data
-                              <input
-                                type="date"
-                                value={blockForm.blockDate}
-                                onChange={(event) =>
-                                  setBlockForm((current) => ({
-                                    ...current,
-                                    blockDate: event.target.value,
-                                  }))
-                                }
-                                required
-                              />
-                            </label>
-                            <label>
-                              Motivo
-                              <input
-                                value={blockForm.reason}
-                                onChange={(event) =>
-                                  setBlockForm((current) => ({
-                                    ...current,
-                                    reason: event.target.value,
-                                  }))
-                                }
-                                maxLength={240}
-                                placeholder="Ex.: compromisso"
-                              />
-                            </label>
-                            <label>
-                              Início
-                              <input
-                                type="time"
-                                value={blockForm.startTime}
-                                onChange={(event) =>
-                                  setBlockForm((current) => ({
-                                    ...current,
-                                    startTime: event.target.value,
-                                  }))
-                                }
-                                required
-                              />
-                            </label>
-                            <label>
-                              Fim
-                              <input
-                                type="time"
-                                value={blockForm.endTime}
-                                onChange={(event) =>
-                                  setBlockForm((current) => ({
-                                    ...current,
-                                    endTime: event.target.value,
-                                  }))
-                                }
-                                required
-                              />
-                            </label>
-                          </div>
-                          <button
-                            className="button button-gold"
-                            type="submit"
-                            disabled={saving}
-                          >
-                            Bloquear horário <span>↗</span>
-                          </button>
-                        </form>
-                        <section className="admin-panel">
-                          <div className="admin-panel-heading">
-                            <div>
-                              <span>Próximos bloqueios</span>
-                              <h2>Indisponibilidades</h2>
-                            </div>
-                          </div>
-                          <div className="admin-professional-list">
-                            {schedule?.blocks
-                              .filter(
-                                (block) =>
-                                  block.professionalId ===
-                                  selectedProfessionalId,
-                              )
-                              .map((block) => (
-                                <article key={block.id}>
-                                  <div>
-                                    <strong>
-                                      {block.blockDate
-                                        .split("-")
-                                        .reverse()
-                                        .join("/")}{" "}
-                                      · {block.startTime}–{block.endTime}
-                                    </strong>
-                                    <small>
-                                      {block.reason ?? "Sem motivo informado"}
-                                    </small>
-                                  </div>
-                                  <button
-                                    className="text-button"
-                                    type="button"
-                                    disabled={saving}
-                                    onClick={() => void removeBlock(block.id)}
-                                  >
-                                    Remover
-                                  </button>
-                                </article>
-                              )) ?? <p>Nenhum bloqueio futuro.</p>}
-                          </div>
-                        </section>
-                      </section>
+
                     </>
                   )}
                 </div>
@@ -1404,17 +1460,17 @@ export default function AdminPage() {
                     </label>
                     <div className="admin-form-grid">
                       <label>
-                        Duração (minutos)
+                        Duração (horas)
                         <input
                           type="number"
-                          min="15"
-                          max="720"
-                          step="15"
-                          value={serviceForm.durationMinutes}
+                          min="0.25"
+                          max="12"
+                          step="0.01"
+                          value={serviceForm.durationHours}
                           onChange={(event) =>
                             setServiceForm((current) => ({
                               ...current,
-                              durationMinutes: event.target.value,
+                              durationHours: event.target.value,
                             }))
                           }
                           required
@@ -1428,10 +1484,6 @@ export default function AdminPage() {
                             setServiceForm((current) => ({
                               ...current,
                               priceType: event.target.value,
-                              price:
-                                event.target.value === "consultation"
-                                  ? ""
-                                  : current.price,
                             }))
                           }
                         >
@@ -1442,22 +1494,27 @@ export default function AdminPage() {
                       </label>
                     </div>
                     {serviceForm.priceType !== "consultation" && (
-                      <label>
-                        Valor (R$)
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={serviceForm.price}
-                          onChange={(event) =>
-                            setServiceForm((current) => ({
-                              ...current,
-                              price: event.target.value,
-                            }))
-                          }
-                          required
-                        />
-                      </label>
+                      <fieldset className="admin-service-checks admin-size-prices">
+                        <legend>Preço por tamanho (R$)</legend>
+                        <div className="admin-form-grid">
+                          {hairSizes.map((size) => (
+                            <label key={size}>
+                              Tamanho {size}
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={serviceForm.sizePrices[size]}
+                                onChange={(event) => setServiceForm((current) => ({
+                                  ...current,
+                                  sizePrices: { ...current.sizePrices, [size]: event.target.value },
+                                }))}
+                                required
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
                     )}
                     <label className="admin-toggle">
                       <input
@@ -1502,13 +1559,12 @@ export default function AdminPage() {
                         </div>
                         <div>
                           <strong>
-                            {service.priceType === "starting_at"
-                              ? "A partir de "
-                              : ""}
-                            {money(service.priceCents)}
+                            {service.priceType === "consultation"
+                              ? "Sob consulta em todos os tamanhos"
+                              : hairSizes.map((size) => `${size}: ${money(priceForHairSize(service.sizePrices, size, service.priceCents))}`).join(" · ")}
                           </strong>
                           <small>
-                            {service.durationMinutes} minutos ·{" "}
+                            {formatDurationInHours(service.durationMinutes)} ·{" "}
                             {service.active ? "ativo" : "inativo"}
                           </small>
                           <button

@@ -8,7 +8,9 @@ import { formatWhatsapp, normalizeWhatsapp } from "../../lib/masks";
 import { whatsappHref } from "../../lib/public-links";
 import { PublicBrand, usePublicSettings } from "../public-settings";
 import CalendarMonths from "../calendar-months";
-import { todayInFortaleza } from "../../lib/scheduling";
+import { formatDurationInHours, todayInFortaleza } from "../../lib/scheduling";
+import { hairSizes, isHairSize, priceForHairSize, type HairSize, type HairSizePrices } from "../../lib/hair-sizes";
+import { isInternalRole } from "../../lib/permissions";
 
 type Service = {
   id: string;
@@ -18,9 +20,11 @@ type Service = {
   durationMinutes: number;
   priceCents: number | null;
   priceType: string;
+  sizePrices?: HairSizePrices;
 };
 type Professional = { id: string; name: string; title: string | null };
 type ClientData = { name: string; phone: string; email: string; notes: string };
+type ExistingClient = { id: string; name: string; phone: string; whatsapp: string | null; email: string | null; notes: string | null };
 type AppliedCoupon = {
   id: string;
   title: string;
@@ -86,6 +90,7 @@ const fallbackProfessional: Professional = {
 const steps = [
   "Data",
   "Horário",
+  "Tamanho",
   "Serviço",
   "Profissional",
   "Seus dados",
@@ -105,14 +110,12 @@ function dateLabel(value: string) {
     .replace(".", "");
 }
 function durationLabel(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  return minutes % 60 === 0
-    ? `${minutes / 60}h`
-    : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;
+  return formatDurationInHours(minutes);
 }
-function priceLabel(service: Service) {
-  if (service.priceCents === null) return "Sob consulta";
-  return `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.priceCents / 100)}`;
+function priceLabel(service: Service, size: HairSize) {
+  const priceCents = priceForHairSize(service.sizePrices, size, service.priceCents);
+  if (priceCents === null) return "Sob consulta";
+  return `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(priceCents / 100)}`;
 }
 export default function BookingPage() {
   const settings = usePublicSettings();
@@ -128,13 +131,16 @@ export default function BookingPage() {
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState("");
   const [availableServiceIds, setAvailableServiceIds] = useState<string[]>([]);
+  const [serviceIdsBySlot, setServiceIdsBySlot] = useState<Record<string, string[]>>({});
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [step, setStep] = useState(1);
+  const [hairSize, setHairSize] = useState<HairSize | "">("");
   const [serviceId, setServiceId] = useState("");
   const [professionalId, setProfessionalId] = useState(fallbackProfessional.id);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const autoAdvanceToClientData = useRef(false);
   const [client, setClient] = useState<ClientData>({
     name: "",
     phone: "",
@@ -148,6 +154,10 @@ export default function BookingPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rescheduleId, setRescheduleId] = useState("");
+  const [ownerBooking, setOwnerBooking] = useState(false);
+  const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
+  const [selectedExistingClientId, setSelectedExistingClientId] = useState("");
+  const [existingClientsLoading, setExistingClientsLoading] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(
     null,
@@ -164,16 +174,18 @@ export default function BookingPage() {
     dateOptions.find((item) => item.value === date)?.label ??
     "Escolha uma data";
   const dateServices = services.filter((service) =>
-    availableServiceIds.includes(service.id),
+    availableServiceIds.includes(service.id) && (serviceIdsBySlot[time] ?? []).includes(service.id),
   );
 
   function chooseDate(value: string) {
     if (value !== date) {
       setTime("");
+      setHairSize("");
+      setServiceId("");
       setAvailableServiceIds([]);
+      setServiceIdsBySlot({});
       setProfessionals([]);
       if (date) {
-        setServiceId("");
         setProfessionalId("");
         setCouponCode("");
         setAppliedCoupon(null);
@@ -189,9 +201,11 @@ export default function BookingPage() {
     const search = new URLSearchParams(window.location.search);
     const requestedServiceId = search.get("service")?.trim() ?? "";
     const requestedProfessionalId = search.get("professional")?.trim() ?? "";
+    const requestedHairSize = search.get("hairSize");
     const requestedDate = search.get("date")?.trim() ?? "";
     setRescheduleId(search.get("reschedule")?.trim() ?? "");
     if (requestedProfessionalId) setProfessionalId(requestedProfessionalId);
+    if (isHairSize(requestedHairSize)) setHairSize(requestedHairSize);
 
     void fetch("/api/booking-dates", { cache: "no-store" })
       .then(async (response) => {
@@ -226,13 +240,33 @@ export default function BookingPage() {
             name?: string;
             phone?: string | null;
             email?: string;
+            role?: string;
           };
-          setClient((current) => ({
-            ...current,
-            name: account.name ?? current.name,
-            phone: formatWhatsapp(account.phone ?? current.phone),
-            email: account.email ?? current.email,
-          }));
+          if (account.role === "client") {
+            setClient((current) => ({
+              ...current,
+              name: account.name ?? current.name,
+              phone: formatWhatsapp(account.phone ?? current.phone),
+              email: account.email ?? current.email,
+            }));
+          }
+          if (account.role && isInternalRole(account.role)) {
+            setOwnerBooking(true);
+            setClient({ name: "", phone: "", email: "", notes: "" });
+            setExistingClientsLoading(true);
+            void fetch("/api/admin/booking-clients", { cache: "no-store" })
+              .then(async (clientsResponse) => {
+                const clientsResult = await clientsResponse.json().catch(() => ({}));
+                if (!clientsResponse.ok || !Array.isArray(clientsResult.clients)) {
+                  throw new Error(typeof clientsResult.message === "string" ? clientsResult.message : "Não foi possível carregar os clientes cadastrados.");
+                }
+                if (active) setExistingClients(clientsResult.clients as ExistingClient[]);
+              })
+              .catch((cause: unknown) => {
+                if (active) setError(cause instanceof Error ? cause.message : "Não foi possível carregar os clientes cadastrados.");
+              })
+              .finally(() => { if (active) setExistingClientsLoading(false); });
+          }
         }
       })
       .catch(() => undefined);
@@ -281,7 +315,7 @@ export default function BookingPage() {
 
   useEffect(() => {
     let active = true;
-    if (!date || (step !== 2 && step !== 4)) {
+    if (!date || (step !== 2 && step !== 5)) {
       setAvailabilityNote("");
       setAvailabilityLoading(false);
       return () => {
@@ -294,7 +328,7 @@ export default function BookingPage() {
     setAvailabilityLoading(true);
     const queryParams = new URLSearchParams({ date });
     const choosingDateAndTime = step === 2;
-    if (step === 4) {
+    if (step === 5) {
       queryParams.set("serviceId", serviceId);
       queryParams.set("time", time);
       if (professionalId) queryParams.set("professionalId", professionalId);
@@ -326,6 +360,13 @@ export default function BookingPage() {
             ? result.serviceIds.filter((value: unknown): value is string => typeof value === "string")
             : [];
           setAvailableServiceIds(nextServiceIds);
+          const nextServiceIdsBySlot = result.serviceIdsBySlot && typeof result.serviceIdsBySlot === "object"
+            ? Object.fromEntries(Object.entries(result.serviceIdsBySlot as Record<string, unknown>).map(([slot, ids]) => [
+                slot,
+                Array.isArray(ids) ? ids.filter((value): value is string => typeof value === "string") : [],
+              ]))
+            : {};
+          setServiceIdsBySlot(nextServiceIdsBySlot);
           setProfessionals([]);
           setSlots(nextSlots);
           if (serviceId && !nextServiceIds.includes(serviceId)) {
@@ -368,7 +409,10 @@ export default function BookingPage() {
           );
         } else {
           setAvailabilityNote("");
-          if (step === 4) setStep(5);
+          if (step === 5 && autoAdvanceToClientData.current) {
+            autoAdvanceToClientData.current = false;
+            setStep(6);
+          }
         }
       })
       .catch(() => {
@@ -386,6 +430,17 @@ export default function BookingPage() {
     setClient((current) => ({ ...current, [field]: value }));
     setError("");
   }
+  function selectExistingClient(clientId: string) {
+    setSelectedExistingClientId(clientId);
+    const selectedClient = existingClients.find((item) => item.id === clientId);
+    setClient(selectedClient ? {
+      name: selectedClient.name,
+      phone: formatWhatsapp(selectedClient.whatsapp ?? selectedClient.phone),
+      email: selectedClient.email ?? "",
+      notes: selectedClient.notes ?? "",
+    } : { name: "", phone: "", email: "", notes: "" });
+    setError("");
+  }
   async function applyCoupon() {
     const normalized = couponCode.trim().toUpperCase().replace(/\s+/g, "");
     if (!normalized)
@@ -397,7 +452,7 @@ export default function BookingPage() {
       const response = await fetch("/api/promotions/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ couponCode: normalized, serviceId }),
+        body: JSON.stringify({ couponCode: normalized, serviceId, hairSize }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok)
@@ -420,11 +475,11 @@ export default function BookingPage() {
   }
   function goNext() {
     setError("");
-    if (step === 5 && !client.name.trim())
+    if (step === 6 && !client.name.trim())
       return setError("Informe seu nome para continuar.");
-    if (step === 5 && !normalizeWhatsapp(client.phone))
+    if (step === 6 && !normalizeWhatsapp(client.phone))
       return setError("Informe um WhatsApp válido para continuar.");
-    if (step === 6 && couponCode.trim() && !appliedCoupon)
+    if (step === 7 && couponCode.trim() && !appliedCoupon)
       return setError(
         "Clique em aplicar para validar o cupom ou apague o código para continuar sem cupom.",
       );
@@ -432,6 +487,7 @@ export default function BookingPage() {
   }
   function goBack() {
     setError("");
+    autoAdvanceToClientData.current = false;
     setStep((current) => Math.max(1, current - 1));
   }
   async function submitBooking() {
@@ -448,7 +504,9 @@ export default function BookingPage() {
           professionalId,
           appointmentDate: date,
           startTime: time,
+          hairSize,
           client,
+          clientId: selectedExistingClientId || undefined,
           couponCode: appliedCoupon?.couponCode,
           rescheduleId: rescheduleId || undefined,
         }),
@@ -542,7 +600,7 @@ export default function BookingPage() {
             <br />
             <em>o seu horário.</em>
           </h1>
-          <p>Escolha a data, o horário, o serviço e a profissional. Cada escolha leva à próxima etapa.</p>
+          <p>Escolha a data, o horário e o tamanho do cabelo para ver os preços dos serviços antes de reservar.</p>
           <div className="booking-steps" aria-label="Etapas do agendamento">
             {steps.map((label, index) => (
               <div
@@ -619,9 +677,63 @@ export default function BookingPage() {
             )}
             {step === 3 && (
               <div>
+                <h2 id="booking-panel-title">Qual é o tamanho do seu cabelo?</h2>
+                <p className="booking-helper">
+                  Data e início: <strong>{selectedDate}, às {time}</strong>. Escolha o tamanho para ver os valores dos serviços.
+                </p>
+                <fieldset className="booking-fieldset">
+                  <legend>Tamanho do cabelo</legend>
+                  <div className="booking-hair-size-picker">
+                    <figure className="booking-hair-size-photo">
+                      <img
+                        src="/hair-length-guide.png"
+                        alt="Referência visual do comprimento do cabelo, igual à página inicial."
+                      />
+                      <figcaption aria-label="Comprimentos: P, M, G e EX">
+                        <span className="home-hair-guide home-hair-guide-p" aria-hidden="true" />
+                        <span className="home-hair-size home-hair-size-p" aria-hidden="true">P</span>
+                        <span className="home-hair-guide home-hair-guide-m" aria-hidden="true" />
+                        <span className="home-hair-size home-hair-size-m" aria-hidden="true">M</span>
+                        <span className="home-hair-guide home-hair-guide-g" aria-hidden="true" />
+                        <span className="home-hair-size home-hair-size-g" aria-hidden="true">G</span>
+                        <span className="home-hair-guide home-hair-guide-ex" aria-hidden="true" />
+                        <span className="home-hair-size home-hair-size-ex" aria-hidden="true">EX</span>
+                      </figcaption>
+                    </figure>
+                    <div className="booking-hair-size-grid">
+                      {hairSizes.map((size) => (
+                        <button
+                          className={`booking-date-option ${hairSize === size ? "selected" : ""}`}
+                          type="button"
+                          key={size}
+                          aria-label={`Tamanho ${size} — ${size === "P" ? "Pequeno" : size === "M" ? "Médio" : size === "G" ? "Grande" : "Extra grande"}`}
+                          aria-pressed={hairSize === size}
+                          onClick={() => {
+                            if (hairSize && hairSize !== size) {
+                              setServiceId("");
+                              setCouponCode("");
+                              setAppliedCoupon(null);
+                              setProfessionals([]);
+                              setProfessionalId("");
+                            }
+                            setHairSize(size);
+                            setError("");
+                            setStep(4);
+                          }}
+                        >
+                          <strong>{size}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+            )}
+            {step === 4 && hairSize && (
+              <div>
                 <h2 id="booking-panel-title">Agora escolha seu serviço</h2>
                 <p className="booking-helper">
-                  Início selecionado: <strong>{selectedDate}, às {time}</strong>. Mostramos apenas serviços liberados para esta data.
+                  {hairSize} selecionado · {selectedDate}, às {time}. Os preços abaixo correspondem ao tamanho escolhido.
                 </p>
                 {servicesLoading ? <p className="booking-helper">Carregando os serviços liberados para esta data…</p> : servicesError ? <p className="booking-helper" role="status">{servicesError}</p> : dateServices.length ? <div className="booking-service-grid">
                   {dateServices.map((service) => (
@@ -639,7 +751,7 @@ export default function BookingPage() {
                           setAppliedCoupon(null);
                         }
                         setError("");
-                        setStep(4);
+                        setStep(5);
                       }}
                     >
                       <span className="booking-option-check" aria-hidden="true">
@@ -649,14 +761,14 @@ export default function BookingPage() {
                       <strong>{service.name}</strong>
                       <span>
                         {durationLabel(service.durationMinutes)} ·{" "}
-                        {priceLabel(service)}
+                        {priceLabel(service, hairSize)}
                       </span>
                     </button>
                   ))}
                 </div> : <p className="booking-helper" role="status">Nenhum serviço está disponível nesta data. Volte e escolha outra data.</p>}
               </div>
             )}
-            {step === 4 && (
+            {step === 5 && (
               <div>
                 <h2 id="booking-panel-title">Escolha a profissional</h2>
                 <p className="booking-helper">
@@ -675,6 +787,7 @@ export default function BookingPage() {
                           key={professional.id}
                           aria-pressed={professional.id === professionalId}
                           onClick={() => {
+                            autoAdvanceToClientData.current = true;
                             setProfessionalId(professional.id);
                             setAvailabilityNote("Confirmando a disponibilidade do horário…");
                             setError("");
@@ -696,12 +809,20 @@ export default function BookingPage() {
                 )}
               </div>
             )}
-            {step === 5 && (
+            {step === 6 && (
               <div>
                 <h2 id="booking-panel-title">Como podemos falar com você?</h2>
                 <p className="booking-helper">
                   Usaremos estes dados somente para confirmar seu atendimento.
                 </p>
+                {ownerBooking && !rescheduleId && <label className="booking-full-field booking-existing-client">
+                  Cliente já cadastrada
+                  <select value={selectedExistingClientId} onChange={(event) => selectExistingClient(event.target.value)} disabled={existingClientsLoading}>
+                    <option value="">{existingClientsLoading ? "Carregando clientes…" : "Novo cadastro"}</option>
+                    {existingClients.map((existingClient) => <option key={existingClient.id} value={existingClient.id}>{existingClient.name} · {existingClient.whatsapp ?? existingClient.phone}</option>)}
+                  </select>
+                  <small>Ao escolher um nome, os dados cadastrados serão preenchidos abaixo.</small>
+                </label>}
                 <div className="booking-form-grid">
                   <label>
                     Nome completo
@@ -759,7 +880,7 @@ export default function BookingPage() {
                 </div>
               </div>
             )}
-            {step === 6 && (
+            {step === 7 && (
               <div>
                 <h2 id="booking-panel-title">Você tem um cupom?</h2>
                 <p className="booking-helper">
@@ -788,7 +909,7 @@ export default function BookingPage() {
                 </div>
               </div>
             )}
-            {step === 7 && (
+            {step === 8 && (
               <div>
                 <h2 id="booking-panel-title">Está tudo certo?</h2>
                 <p className="booking-helper">
@@ -800,9 +921,10 @@ export default function BookingPage() {
                     <strong>{selectedService.name}</strong>
                     <small>
                       {durationLabel(selectedService.durationMinutes)} ·{" "}
-                      {priceLabel(selectedService)}
+                      {hairSize ? priceLabel(selectedService, hairSize) : "Escolha o tamanho"}
                     </small>
                   </div>
+                  <div><span>Tamanho</span><strong>{hairSize || "Não escolhido"}</strong></div>
                   <div>
                     <span>Data e horário</span>
                     <strong>{selectedDate}</strong>
@@ -852,7 +974,7 @@ export default function BookingPage() {
                   Ver serviços
                 </a>
               )}
-              {step >= 5 && step < steps.length ? (
+              {step >= 6 && step < steps.length ? (
                 <button
                   className="button button-gold"
                   type="button"
@@ -884,7 +1006,7 @@ export default function BookingPage() {
                   <strong>{selectedDate}, {time}</strong>
                 </div>
               )}
-              {serviceId && (
+              {serviceId && hairSize && (
                 <>
                   <div className="booking-aside-detail">
                     <span>Profissional</span>
@@ -896,7 +1018,7 @@ export default function BookingPage() {
                   </div>
                   <div className="booking-aside-detail">
                     <span>Investimento</span>
-                    <strong>{priceLabel(selectedService)}</strong>
+                    <strong>{priceLabel(selectedService, hairSize)}</strong>
                   </div>
                 </>
               )}

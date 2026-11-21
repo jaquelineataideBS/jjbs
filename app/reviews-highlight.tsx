@@ -35,8 +35,9 @@ export default function ReviewsHighlight() {
         <p>Avaliações de quem já viveu um momento de cuidado no studio.</p>
       </div>
       <div className="home-review-carousel">
-        {items.map((item) => (
-          <article key={item.id}>
+        {items.map((item, index) => (
+          <article className={index === 0 ? "home-review-featured" : undefined} key={item.id}>
+            {index === 0 && <span className="home-review-featured-label">Avaliação em destaque</span>}
             {item.comment ? (
               <blockquote>“{item.comment}”</blockquote>
             ) : (

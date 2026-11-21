@@ -134,6 +134,20 @@
       "when": 1794960273492,
       "tag": "0018_lgpd_kit_expansion",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795219200000,
+      "tag": "0019_hair_size_pricing",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795219200001,
+      "tag": "0020_portfolio_video",
+      "breakpoints": true
     }
   ]
 }

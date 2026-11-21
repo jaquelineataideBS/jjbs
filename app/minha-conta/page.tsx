@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { formatWhatsapp } from "../../lib/masks";
 import { isInternalRole } from "../../lib/permissions";
 import AccountReviews from "./account-reviews";
-import { PublicBrand } from "../public-settings";
+import { PublicBrand, usePublicSettings } from "../public-settings";
 import PushNotificationsControl from "../push-notifications-control";
 
 type AccountUser = {
@@ -24,6 +24,7 @@ type AccountAppointment = {
   endTime: string;
   status: string;
   totalEstimatedCents: number | null;
+  hairSize: string | null;
   serviceId: string | null;
   serviceName: string | null;
   professionalId: string | null;
@@ -99,6 +100,7 @@ function money(value: number | null) {
 }
 
 export default function MyAccountPage() {
+  const settings = usePublicSettings();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [form, setForm] = useState<FormData>(emptyForm);
   const [user, setUser] = useState<AccountUser | null>(null);
@@ -459,6 +461,7 @@ export default function MyAccountPage() {
                         <strong>
                           {appointment.serviceName ?? "Atendimento no studio"}
                         </strong>
+                        {appointment.hairSize && <span>Tamanho {appointment.hairSize}</span>}
                         <span>
                           {dateLabel(appointment.appointmentDate)} ·{" "}
                           {appointment.startTime}
@@ -473,7 +476,7 @@ export default function MyAccountPage() {
                         <div className="account-appointment-actions">
                           {appointment.canReschedule && <a
                             className="text-button"
-                            href={`/agendar?reschedule=${encodeURIComponent(appointment.id)}&service=${encodeURIComponent(appointment.serviceId ?? "")}&professional=${encodeURIComponent(appointment.professionalId ?? "")}`}
+                            href={`/agendar?reschedule=${encodeURIComponent(appointment.id)}&service=${encodeURIComponent(appointment.serviceId ?? "")}&professional=${encodeURIComponent(appointment.professionalId ?? "")}&hairSize=${encodeURIComponent(appointment.hairSize ?? "")}`}
                           >
                             Reagendar
                           </a>}
@@ -530,6 +533,7 @@ export default function MyAccountPage() {
                         <strong>
                           {appointment.serviceName ?? "Atendimento no studio"}
                         </strong>
+                        {appointment.hairSize && <span>Tamanho {appointment.hairSize}</span>}
                         <span>
                           {dateLabel(appointment.appointmentDate)} ·{" "}
                           {appointment.startTime}
@@ -652,13 +656,27 @@ export default function MyAccountPage() {
             </article>
             <article className="account-card loyalty-account-card">
               <span className="account-card-label">Sua fidelidade</span>
+              <div className="loyalty-stamp-card" aria-label={`${Math.min(loyalty.account.stamps, 5)} de 5 carimbos`}>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <span className={index < Math.min(loyalty.account.stamps, 5) ? "earned" : ""} key={index} aria-hidden="true">
+                    {index < Math.min(loyalty.account.stamps, 5)
+                      ? <img src={settings.logoUrl || "/jaqueline-justino-monogram.png?v=1"} alt="" />
+                      : index + 1}
+                  </span>
+                ))}
+              </div>
+              <p className="loyalty-reward-status">
+                {loyalty.account.stamps >= 5
+                  ? "Você ganhou uma hidratação totalmente grátis! O studio registra o resgate quando você usar."
+                  : `Faltam ${5 - Math.min(loyalty.account.stamps, 5)} atendimento${5 - Math.min(loyalty.account.stamps, 5) === 1 ? "" : "s"} concluído${5 - Math.min(loyalty.account.stamps, 5) === 1 ? "" : "s"} para ganhar uma hidratação grátis.`}
+              </p>
               <div className="loyalty-account-numbers">
                 <div>
                   <strong>{loyalty.account.points}</strong>
                   <small>pontos</small>
                 </div>
                 <div>
-                  <strong>{loyalty.account.stamps}</strong>
+                  <strong>{Math.min(loyalty.account.stamps, 5)}</strong>
                   <small>carimbos</small>
                 </div>
                 <div>
@@ -827,7 +845,7 @@ export default function MyAccountPage() {
                   autoComplete={
                     mode === "login" ? "current-password" : "new-password"
                   }
-                  minLength={mode === "login" ? undefined : 12}
+                  minLength={mode === "login" ? undefined : 6}
                   maxLength={128}
                   required
                 />
@@ -847,7 +865,7 @@ export default function MyAccountPage() {
                       updateField("passwordConfirmation", event.target.value)
                     }
                     autoComplete="new-password"
-                    minLength={12}
+                    minLength={6}
                     maxLength={128}
                     required
                   />

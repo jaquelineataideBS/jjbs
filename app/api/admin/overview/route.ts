@@ -4,7 +4,8 @@ import { appointmentServices, appointments, clients, serviceCategories, services
 import { requirePermission } from "../../../../lib/admin";
 import { permissionsForRole } from "../../../../lib/permissions";
 
-const cancelledStatuses = ["cancelled_by_client", "cancelled_by_salon"];
+const cancelledStatuses = ["cancelled", "cancelled_by_client", "cancelled_by_salon"];
+const excludedAgendaStatuses = [...cancelledStatuses, "rescheduled"];
 
 function todayInFortaleza() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Fortaleza" }).format(new Date());
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
         endTime: appointments.endTime,
         status: appointments.status,
         totalEstimatedCents: appointments.totalEstimatedCents,
+        hairSize: appointments.hairSize,
         clientName: clients.name,
         clientPhone: clients.phone,
         serviceName: services.name,
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
         .leftJoin(services, eq(services.id, appointmentServices.serviceId))
         .where(and(
           gte(appointments.appointmentDate, today),
-          notInArray(appointments.status, ["cancelled_by_salon"]),
+          notInArray(appointments.status, excludedAgendaStatuses),
         ))
         .orderBy(asc(appointments.appointmentDate), asc(appointments.startTime))
         .limit(80),
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
         durationMinutes: services.durationMinutes,
         priceType: services.priceType,
         priceCents: services.priceCents,
+        sizePrices: services.sizePrices,
         active: services.active,
       }).from(services)
         .leftJoin(serviceCategories, eq(serviceCategories.id, services.categoryId))
@@ -59,7 +62,7 @@ export async function GET(request: Request) {
         .from(serviceCategories).where(eq(serviceCategories.active, true)).orderBy(asc(serviceCategories.displayOrder)),
     ]);
 
-    const activeAgenda = agenda.filter((item) => !cancelledStatuses.includes(item.status));
+    const activeAgenda = agenda.filter((item) => !cancelledStatuses.includes(item.status) && item.status !== "rescheduled");
     const todayAgenda = activeAgenda.filter((item) => item.appointmentDate === today);
     const pending = activeAgenda.filter((item) => item.status === "pending_confirmation");
     const estimatedCents = todayAgenda.reduce((total, item) => total + (item.totalEstimatedCents ?? 0), 0);

@@ -21,8 +21,8 @@ export async function POST(request: Request) {
 
   const token = typeof body.token === "string" ? body.token : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!/^[A-Za-z0-9_-]{43}$/.test(token) || password.length < 12 || password.length > 128) {
-    return Response.json({ message: "Use um link válido e uma senha com pelo menos 12 caracteres." }, { status: 400 });
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token) || password.length < 6 || password.length > 128) {
+    return Response.json({ message: "Use um link válido e uma senha com pelo menos 6 caracteres." }, { status: 400 });
   }
 
   try {

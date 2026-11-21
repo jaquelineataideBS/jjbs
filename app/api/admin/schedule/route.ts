@@ -1,7 +1,7 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { blockedTimes, businessHours, professionalServices, professionals, services } from "../../../../db/schema";
-import { hasOverlappingRanges, isClockTime, timeToMinutes, todayInFortaleza } from "../../../../lib/scheduling";
+import { appointments, blockedTimes, businessHours, openScheduleDates, portfolioItems, professionalServices, professionals, services, waitlistEntries } from "../../../../db/schema";
+import { hasOverlappingRanges, isClockTime, timeToMinutes } from "../../../../lib/scheduling";
 import { requireAdmin } from "../../../../lib/admin";
 import { normalizeWhatsapp } from "../../../../lib/masks";
 
@@ -48,29 +48,17 @@ function parseHours(value: unknown): HourInput[] | null {
   return result;
 }
 
-function parseBlock(value: unknown) {
-  if (!isRecord(value)) return null;
-  const professionalId = typeof value.professionalId === "string" ? value.professionalId.trim() : "";
-  const blockDate = typeof value.blockDate === "string" ? value.blockDate.trim() : "";
-  const startTime = typeof value.startTime === "string" ? value.startTime : "";
-  const endTime = typeof value.endTime === "string" ? value.endTime : "";
-  const reason = typeof value.reason === "string" ? value.reason.trim() : "";
-  if (!professionalId || !/^\d{4}-\d{2}-\d{2}$/.test(blockDate) || !isClockTime(startTime) || !isClockTime(endTime) || startTime >= endTime || reason.length > 240) return null;
-  return { professionalId, blockDate, startTime, endTime, reason: reason || null };
-}
-
 export async function GET(request: Request) {
   try {
     if (!await requireAdmin(request)) return noStore({ message: "Acesso restrito ao painel administrativo." }, 403);
     const db = await getDb();
-    const [professionalRows, serviceRows, hourRows, blockRows, relationRows] = await Promise.all([
+    const [professionalRows, serviceRows, hourRows, relationRows] = await Promise.all([
       db.select().from(professionals).orderBy(asc(professionals.displayOrder), asc(professionals.name)),
       db.select({ id: services.id, name: services.name, active: services.active }).from(services).orderBy(asc(services.name)),
       db.select().from(businessHours).orderBy(asc(businessHours.professionalId), asc(businessHours.weekday)),
-      db.select().from(blockedTimes).where(gte(blockedTimes.blockDate, todayInFortaleza())).orderBy(asc(blockedTimes.blockDate), asc(blockedTimes.startTime)),
       db.select({ professionalId: professionalServices.professionalId, serviceId: professionalServices.serviceId }).from(professionalServices),
     ]);
-    return noStore({ professionals: professionalRows, services: serviceRows, hours: hourRows, blocks: blockRows, relations: relationRows });
+    return noStore({ professionals: professionalRows, services: serviceRows, hours: hourRows, relations: relationRows });
   } catch {
     return noStore({ message: "Não foi possível carregar a configuração da agenda." }, 500);
   }
@@ -127,15 +115,6 @@ export async function POST(request: Request) {
       return noStore({ saved: true });
     }
 
-    if (body.action === "block") {
-      const input = parseBlock(body);
-      if (!input) return noStore({ message: "Revise data, horário e motivo do bloqueio." }, 400);
-      const [professional] = await db.select({ id: professionals.id }).from(professionals).where(eq(professionals.id, input.professionalId)).limit(1);
-      if (!professional) return noStore({ message: "Profissional não encontrada." }, 404);
-      const [block] = await db.insert(blockedTimes).values({ id: crypto.randomUUID(), ...input }).returning();
-      return noStore({ block }, 201);
-    }
-
     return noStore({ message: "Ação de agenda inválida." }, 400);
   } catch {
     return noStore({ message: "Não foi possível salvar a configuração da agenda." }, 500);
@@ -162,13 +141,32 @@ export async function DELETE(request: Request) {
   try {
     if (!await requireAdmin(request)) return noStore({ message: "Acesso restrito ao painel administrativo." }, 403);
     const body: unknown = await request.json();
-    const id = isRecord(body) && typeof body.id === "string" ? body.id : "";
-    if (!id) return noStore({ message: "Bloqueio inválido." }, 400);
+    const id = isRecord(body) && typeof body.id === "string" ? body.id.trim() : "";
+    if (!id) return noStore({ message: "Informe o profissional ou bloqueio que deseja remover." }, 400);
     const db = await getDb();
+    if (isRecord(body) && body.type === "professional") {
+      const [professional] = await db.select({ id: professionals.id }).from(professionals).where(eq(professionals.id, id)).limit(1);
+      if (!professional) return noStore({ message: "Profissional não encontrada." }, 404);
+      const [existingAppointment] = await db.select({ id: appointments.id }).from(appointments).where(eq(appointments.professionalId, id)).limit(1);
+      if (existingAppointment) {
+        await db.update(professionals).set({ active: false, updatedAt: new Date() }).where(eq(professionals.id, id));
+        return noStore({ removed: true, archived: true, message: "Profissional removida dos agendamentos. O cadastro foi mantido inativo para preservar o histórico de atendimentos." });
+      }
+      await db.batch([
+        db.update(portfolioItems).set({ professionalId: null }).where(eq(portfolioItems.professionalId, id)),
+        db.update(waitlistEntries).set({ professionalId: null }).where(eq(waitlistEntries.professionalId, id)),
+        db.delete(blockedTimes).where(eq(blockedTimes.professionalId, id)),
+        db.delete(openScheduleDates).where(eq(openScheduleDates.professionalId, id)),
+        db.delete(businessHours).where(eq(businessHours.professionalId, id)),
+        db.delete(professionalServices).where(eq(professionalServices.professionalId, id)),
+        db.delete(professionals).where(eq(professionals.id, id)),
+      ]);
+      return noStore({ removed: true, archived: false, message: "Profissional excluída." });
+    }
     const removed = await db.delete(blockedTimes).where(eq(blockedTimes.id, id)).returning({ id: blockedTimes.id });
     if (!removed[0]) return noStore({ message: "Bloqueio não encontrado." }, 404);
     return noStore({ removed: true });
   } catch {
-    return noStore({ message: "Não foi possível remover o bloqueio." }, 500);
+    return noStore({ message: "Não foi possível remover a profissional ou o bloqueio." }, 500);
   }
 }

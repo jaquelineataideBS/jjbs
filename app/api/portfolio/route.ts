@@ -12,6 +12,7 @@ export async function GET() {
         description: portfolioItems.description,
         category: portfolioItems.category,
         mainImageUrl: portfolioItems.mainImageUrl,
+        videoUrl: portfolioItems.videoUrl,
         beforeImageUrl: portfolioItems.beforeImageUrl,
         afterImageUrl: portfolioItems.afterImageUrl,
         featured: portfolioItems.featured,

@@ -1,5 +1,3 @@
-export const ADMIN_OPEN_REQUIRED_FROM = "2027-01-01";
-
 export type TimeRange = { startTime: string; endTime: string };
 
 export function isClockTime(value: string) {
@@ -14,6 +12,10 @@ export function timeToMinutes(value: string) {
 export function addMinutes(startTime: string, durationMinutes: number) {
   const total = timeToMinutes(startTime) + durationMinutes;
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+export function formatDurationInHours(durationMinutes: number) {
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(durationMinutes / 60)} h`;
 }
 
 export function rangesOverlap(first: TimeRange, second: TimeRange) {
@@ -38,18 +40,21 @@ export function buildConfiguredStartSlots(periods: { startTime: string; endTime:
   if (durationMinutes <= 0) return [];
 
   const slots: string[] = [];
-  for (const hours of [...periods].sort((first, second) => first.startTime.localeCompare(second.startTime))) {
-    if (timeToMinutes(hours.startTime) + durationMinutes > timeToMinutes(hours.endTime)) continue;
-
-    const range = {
-      startTime: hours.startTime,
-      endTime: addMinutes(hours.startTime, durationMinutes),
-    };
+  const orderedPeriods = [...periods].sort((first, second) => first.startTime.localeCompare(second.startTime));
+  for (const [index, hours] of orderedPeriods.entries()) {
+    // A configured business-hours row is a start time. Its stored endTime was
+    // derived from the services assigned at the time it was saved and can be
+    // stale when a longer service is added later.
+    const boundary = orderedPeriods[index + 1]?.startTime ?? hours.endTime;
+    const windowEnd = timeToMinutes(boundary);
     const breakRange = hours.breakStart && hours.breakEnd ? { startTime: hours.breakStart, endTime: hours.breakEnd } : null;
 
+    const startTime = hours.startTime;
+    const range = { startTime, endTime: addMinutes(startTime, durationMinutes) };
+    if (timeToMinutes(range.endTime) > windowEnd || timeToMinutes(range.endTime) >= 24 * 60) continue;
     if (breakRange && rangesOverlap(range, breakRange)) continue;
     if (unavailable.some((item) => rangesOverlap(range, item))) continue;
-    slots.push(hours.startTime);
+    slots.push(startTime);
   }
 
   return [...new Set(slots)].sort();

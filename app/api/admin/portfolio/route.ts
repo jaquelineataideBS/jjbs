@@ -4,6 +4,7 @@ import {
   auditLogs,
   portfolioItems,
   professionals,
+  serviceCategories,
   services,
 } from "../../../../db/schema";
 import { requireAdmin } from "../../../../lib/admin";
@@ -17,6 +18,7 @@ type PortfolioInput = {
   serviceId: string | null;
   professionalId: string | null;
   mainImageUrl: string;
+  videoUrl: string | null;
   beforeImageUrl: string | null;
   afterImageUrl: string | null;
   published: boolean;
@@ -52,6 +54,7 @@ function parsePortfolio(value: unknown): PortfolioInput | null {
   const serviceId = optionalText(value.serviceId, 120);
   const professionalId = optionalText(value.professionalId, 120);
   const mainImageUrl = validStoredImagePath(value.mainImageUrl, true);
+  const videoUrl = validStoredImagePath(value.videoUrl);
   const beforeImageUrl = validStoredImagePath(value.beforeImageUrl);
   const afterImageUrl = validStoredImagePath(value.afterImageUrl);
   const displayOrder =
@@ -73,6 +76,7 @@ function parsePortfolio(value: unknown): PortfolioInput | null {
       serviceId,
       professionalId,
       mainImageUrl,
+      videoUrl,
       beforeImageUrl,
       afterImageUrl,
     ].includes(undefined)
@@ -93,6 +97,7 @@ function parsePortfolio(value: unknown): PortfolioInput | null {
     serviceId: serviceId ?? null,
     professionalId: professionalId ?? null,
     mainImageUrl,
+    videoUrl: videoUrl ?? null,
     beforeImageUrl: beforeImageUrl ?? null,
     afterImageUrl: afterImageUrl ?? null,
     published: value.published === true,
@@ -109,6 +114,7 @@ function values(input: PortfolioInput) {
     serviceId: input.serviceId,
     professionalId: input.professionalId,
     mainImageUrl: input.mainImageUrl,
+    videoUrl: input.videoUrl,
     beforeImageUrl: input.beforeImageUrl,
     afterImageUrl: input.afterImageUrl,
     published: input.published,
@@ -156,7 +162,7 @@ export async function GET(request: Request) {
       .trim()
       .toLocaleLowerCase("pt-BR")
       .slice(0, 80);
-    const [items, serviceRows, professionalRows] = await Promise.all([
+    const [items, serviceRows, professionalRows, portfolioCategoryRows, serviceCategoryRows] = await Promise.all([
       db
         .select({
           id: portfolioItems.id,
@@ -168,6 +174,7 @@ export async function GET(request: Request) {
           professionalId: portfolioItems.professionalId,
           professionalName: professionals.name,
           mainImageUrl: portfolioItems.mainImageUrl,
+          videoUrl: portfolioItems.videoUrl,
           beforeImageUrl: portfolioItems.beforeImageUrl,
           afterImageUrl: portfolioItems.afterImageUrl,
           published: portfolioItems.published,
@@ -196,6 +203,16 @@ export async function GET(request: Request) {
         .from(professionals)
         .where(eq(professionals.active, true))
         .orderBy(asc(professionals.name)),
+      db
+        .select({ name: portfolioItems.category })
+        .from(portfolioItems)
+        .groupBy(portfolioItems.category)
+        .orderBy(asc(portfolioItems.category)),
+      db
+        .select({ name: serviceCategories.name })
+        .from(serviceCategories)
+        .where(eq(serviceCategories.active, true))
+        .orderBy(asc(serviceCategories.displayOrder)),
     ]);
     const filtered = items.filter(
       (item) =>
@@ -208,9 +225,48 @@ export async function GET(request: Request) {
       items: filtered,
       services: serviceRows,
       professionals: professionalRows,
+      categories: [...new Set([
+        ...portfolioCategoryRows.map((item) => item.name),
+        ...serviceCategoryRows.map((item) => item.name),
+      ])],
     });
   } catch {
     return noStore({ message: "Não foi possível carregar os trabalhos." }, 500);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin)
+      return noStore(
+        { message: "Acesso restrito ao painel administrativo." },
+        403,
+      );
+    const body: unknown = await request.json();
+    if (!isRecord(body) || typeof body.id !== "string" || !body.id.trim())
+      return noStore({ message: "Selecione um trabalho para excluir." }, 400);
+    const db = await getDb();
+    const [current] = await db
+      .select({ id: portfolioItems.id, title: portfolioItems.title, category: portfolioItems.category, published: portfolioItems.published, featured: portfolioItems.featured })
+      .from(portfolioItems)
+      .where(eq(portfolioItems.id, body.id.trim()))
+      .limit(1);
+    if (!current) return noStore({ message: "Trabalho não encontrado." }, 404);
+    await db.batch([
+      db.delete(portfolioItems).where(eq(portfolioItems.id, current.id)),
+      db.insert(auditLogs).values({
+        id: crypto.randomUUID(),
+        userId: admin.id,
+        action: "portfolio.deleted",
+        entity: "portfolio_item",
+        entityId: current.id,
+        metadata: { title: current.title, category: current.category, published: current.published, featured: current.featured },
+      }),
+    ]);
+    return noStore({ message: "Trabalho excluído da galeria." });
+  } catch {
+    return noStore({ message: "Não foi possível excluir o trabalho." }, 500);
   }
 }
 

@@ -93,6 +93,12 @@ const kindLabels: Record<string, string> = {
   balance: "Saldo",
   full: "Pagamento completo",
 };
+const excludedAppointmentStatuses = new Set([
+  "cancelled",
+  "cancelled_by_client",
+  "cancelled_by_salon",
+  "rescheduled",
+]);
 
 function money(cents: number | null | undefined) {
   return new Intl.NumberFormat("pt-BR", {
@@ -132,9 +138,24 @@ export default function FinanceManagement() {
 
   useEffect(() => {
     load().catch((reason) => setError(reason.message));
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        load().catch((reason) => setError(reason.message));
+      }
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, []);
 
-  const selectedAppointment = data?.appointments.find(
+  const visibleAppointments = useMemo(
+    () => (data?.appointments ?? []).filter((item) => !excludedAppointmentStatuses.has(item.status)),
+    [data],
+  );
+  const selectedAppointment = visibleAppointments.find(
     (item) => item.id === form.appointmentId,
   );
   const filteredTransactions = useMemo(() => {
@@ -149,7 +170,7 @@ export default function FinanceManagement() {
   }, [data, query, statusFilter]);
 
   function chooseAppointment(appointmentId: string) {
-    const appointment = data?.appointments.find((item) => item.id === appointmentId);
+    const appointment = visibleAppointments.find((item) => item.id === appointmentId);
     setForm((current) => ({
       ...current,
       appointmentId,
@@ -262,7 +283,7 @@ export default function FinanceManagement() {
                 Agendamento
                 <select value={form.appointmentId} onChange={(event) => chooseAppointment(event.target.value)} required>
                   <option value="">Selecione</option>
-                  {data.appointments.map((item) => (
+                  {visibleAppointments.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.appointmentDate.split("-").reverse().join("/")} · {item.clientName} · {item.serviceName}
                     </option>

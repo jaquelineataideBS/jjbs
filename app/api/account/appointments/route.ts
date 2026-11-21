@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       endTime: appointments.endTime,
       status: appointments.status,
       totalEstimatedCents: appointments.totalEstimatedCents,
+      hairSize: appointments.hairSize,
       serviceId: appointmentServices.serviceId,
       serviceName: services.name,
       professionalId: appointments.professionalId,

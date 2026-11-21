@@ -31,8 +31,8 @@ export async function POST(request: Request) {
   const phone = normalizeWhatsapp(body.phone);
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || !phone || password.length < 12 || password.length > 128) {
-    return json({ message: "Informe nome, e-mail, WhatsApp e uma senha com pelo menos 12 caracteres." }, 400);
+  if (name.length < 2 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || !phone || password.length < 6 || password.length > 128) {
+    return json({ message: "Informe nome, e-mail, WhatsApp e uma senha com pelo menos 6 caracteres." }, 400);
   }
 
   try {

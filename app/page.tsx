@@ -5,6 +5,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { portfolioItems, serviceCategories, services } from "../db/schema";
 import { getPublicSettings } from "../lib/public-settings";
+import { formatDurationInHours } from "../lib/scheduling";
 import { instagramHref, whatsappHref } from "../lib/public-links";
 import HomeInteractions from "./home-interactions";
 import HomeSchedule from "./home-schedule";
@@ -16,9 +17,9 @@ const getHighlights = cache(async function getHighlights() {
   try {
     const db = await getDb();
     const [serviceRows, workRows] = await Promise.all([
-      db.select({ id: services.id, name: services.name, description: services.description, duration: services.durationMinutes, price: services.priceCents, priceType: services.priceType })
+      db.select({ id: services.id, name: services.name, description: services.description, duration: services.durationMinutes })
         .from(services).leftJoin(serviceCategories, eq(serviceCategories.id, services.categoryId)).where(eq(services.active, true)).orderBy(asc(serviceCategories.displayOrder), asc(services.name)).limit(3),
-      db.select({ id: portfolioItems.id, image: portfolioItems.mainImageUrl, category: portfolioItems.category, title: portfolioItems.title })
+      db.select({ id: portfolioItems.id, image: portfolioItems.mainImageUrl, videoUrl: portfolioItems.videoUrl, category: portfolioItems.category, title: portfolioItems.title })
         .from(portfolioItems).where(and(eq(portfolioItems.published, true), eq(portfolioItems.featured, true))).orderBy(asc(portfolioItems.displayOrder)).limit(3),
     ]);
     return { serviceRows, workRows: workRows.filter(work => !/^https?:\/\/(?:images\.)?unsplash\.com\//i.test(work.image)) };
@@ -56,7 +57,7 @@ async function HomeServices() {
   return (
     <section className="home-services home-section" aria-labelledby="services-title">
       <div className="home-section-top"><h2 id="services-title">O seu próximo cuidado.</h2><a className="home-link" href="/servicos">Todos os serviços ↗</a></div>
-      {serviceRows.length ? <div className="home-service-list">{serviceRows.map(service => <a href="/agendar" key={service.id} className="home-service"><h3>{service.name}</h3><p>{service.description}</p><div><span>{service.duration >= 60 ? `${Math.floor(service.duration / 60)}h${service.duration % 60 ? String(service.duration % 60).padStart(2, "0") : ""}` : `${service.duration} min`}</span><strong>{service.price === null ? "Sob consulta" : `${service.priceType === "starting_at" ? "A partir de " : ""}${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.price / 100)}`}</strong></div><span className="home-service-arrow" aria-hidden="true">↗</span></a>)}</div> : <div className="home-service-empty"><p>Uma mudança de visual ou um momento de cuidado? Conheça os serviços e escolha o atendimento para você.</p><a className="home-button" href="/servicos">Explorar serviços ↗</a></div>}
+      {serviceRows.length ? <div className="home-service-list">{serviceRows.map(service => <a href="/agendar" key={service.id} className="home-service"><h3>{service.name}</h3><p>{service.description}</p><div><span>{formatDurationInHours(service.duration)}</span><strong>Preço conforme o tamanho</strong></div><span className="home-service-arrow" aria-hidden="true">↗</span></a>)}</div> : <div className="home-service-empty"><p>Uma mudança de visual ou um momento de cuidado? Conheça os serviços e escolha o atendimento para você.</p><a className="home-button" href="/servicos">Explorar serviços ↗</a></div>}
     </section>
   );
 }
@@ -67,7 +68,7 @@ async function HomeWork() {
   return (
     <section className="home-work home-section" aria-labelledby="work-title">
       <div className="home-section-top"><h2 id="work-title">Nossa assinatura.</h2><a className="home-link" href="/trabalhos">Ver todos os trabalhos ↗</a></div>
-      <div className={`home-work-grid${workRows.length < 3 ? " home-work-pair" : ""}`}>{workRows.map(work => <a href="/trabalhos" key={work.id}><figure><img src={work.image} alt={work.title || work.category || "Trabalho realizado no studio"} loading="lazy" /><figcaption><span>{work.title || work.category || "Conheça este resultado"}</span><span aria-hidden="true">↗</span></figcaption></figure>{work.title && work.category && work.title !== work.category && <p>{work.category}</p>}</a>)}</div>
+      <div className={`home-work-grid${workRows.length < 3 ? " home-work-pair" : ""}`}>{workRows.map(work => <article key={work.id}><a href="/trabalhos"><figure><img src={work.image} alt={work.title || work.category || "Trabalho realizado no studio"} loading="lazy" /><figcaption><span>{work.title || work.category || "Conheça este resultado"}</span><span aria-hidden="true">↗</span></figcaption></figure></a>{work.videoUrl && <video className="home-work-video" src={work.videoUrl} controls playsInline preload="metadata" aria-label={`Vídeo do procedimento: ${work.title || work.category}`} />}{work.title && work.category && work.title !== work.category && <p>{work.category}</p>}</article>)}</div>
     </section>
   );
 }
@@ -101,6 +102,25 @@ export default async function Home() {
           <p className="home-hero-note">Do primeiro cuidado ao toque final, o seu estilo guia cada escolha.</p>
         </div>
         <figure className="home-portrait"><img src={portrait} alt={`${name} no Beauty Studio`} fetchPriority="high" /></figure>
+      </section>
+      <section className="home-hair-length home-section" aria-labelledby="hair-length-title">
+        <div className="home-hair-length-copy">
+          <h2 id="hair-length-title">Veja o tamanho do seu cabelo</h2>
+          <p>Uma referência de comprimento para a Progressiva Orgânica.</p>
+        </div>
+        <figure className="home-hair-length-visual">
+          <img src="/hair-length-guide.png" alt="Cabelo longo e liso, com indicações de comprimento P, M, G e EX." loading="lazy" />
+          <figcaption aria-label="Comprimentos: P, M, G e EX">
+            <span className="home-hair-guide home-hair-guide-p" aria-hidden="true" />
+            <span className="home-hair-size home-hair-size-p" aria-hidden="true">P</span>
+            <span className="home-hair-guide home-hair-guide-m" aria-hidden="true" />
+            <span className="home-hair-size home-hair-size-m" aria-hidden="true">M</span>
+            <span className="home-hair-guide home-hair-guide-g" aria-hidden="true" />
+            <span className="home-hair-size home-hair-size-g" aria-hidden="true">G</span>
+            <span className="home-hair-guide home-hair-guide-ex" aria-hidden="true" />
+            <span className="home-hair-size home-hair-size-ex" aria-hidden="true">EX</span>
+          </figcaption>
+        </figure>
       </section>
       <Suspense fallback={<HomeScheduleLoading />}><HomeSchedule /></Suspense>
       <Suspense fallback={<HomeServicesLoading />}><HomeServices /></Suspense>

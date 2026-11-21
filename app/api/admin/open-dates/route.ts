@@ -19,16 +19,23 @@ export async function GET(request: Request) {
   try {
     const db = await getDb();
     const [serviceRows, rows] = await Promise.all([
-      db.select({ id: services.id, name: services.name }).from(professionalServices)
+      db.select({ id: services.id, name: services.name, professionalId: professionalServices.professionalId }).from(professionalServices)
         .innerJoin(services, eq(services.id, professionalServices.serviceId))
         .where(and(eq(professionalServices.professionalId, professionalId), eq(services.active, true))),
       db.select({ date: openScheduleDates.date, serviceIds: openScheduleDates.serviceIds }).from(openScheduleDates)
         .where(and(eq(openScheduleDates.professionalId, professionalId), gte(openScheduleDates.date, `${month}-01`), lte(openScheduleDates.date, `${month}-31`))),
     ]);
+    const serviceIdsByProfessional = new Map<string, string[]>();
+    for (const service of serviceRows) {
+      const ids = serviceIdsByProfessional.get(service.professionalId) ?? [];
+      ids.push(service.id);
+      serviceIdsByProfessional.set(service.professionalId, ids);
+    }
     return respond({
       services: serviceRows,
-      // An empty list is an explicit day-off override. Older null rows remain closed until edited.
-      dates: rows.map(row => ({ date: row.date, serviceIds: row.serviceIds ?? [] })),
+      // Older null rows meant every service for the professional was enabled.
+      // Keep that meaning so dates saved before service-specific openings stay open.
+      dates: rows.map(row => ({ date: row.date, serviceIds: row.serviceIds ?? serviceIdsByProfessional.get(professionalId) ?? [] })),
     });
   } catch { return respond({ message: "Não foi possível carregar as datas." }, 500); }
 }

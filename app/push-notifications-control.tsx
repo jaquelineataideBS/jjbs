@@ -74,8 +74,10 @@ export default function PushNotificationsControl({ audience }: Props) {
   }, [activate, audience]);
 
   async function setConsent(enabled: boolean) {
+    const previousConsent = marketingConsent;
     setWorking(true);
     setFeedback("");
+    setMarketingConsent(enabled);
     try {
       const response = await fetch("/api/account/push-installations", {
         method: "PATCH",
@@ -91,6 +93,7 @@ export default function PushNotificationsControl({ audience }: Props) {
       setFeedback(enabled ? "Preferência de promoções salva." : "Você não receberá cupons e promoções por push.");
       setIsError(false);
     } catch (reason) {
+      setMarketingConsent(previousConsent);
       setFeedback(reason instanceof Error ? reason.message : "Não foi possível salvar sua preferência.");
       setIsError(true);
     } finally {
